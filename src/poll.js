@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { notify } from "./notify.js";
-import { checkDistrict } from "./sources/district.js";
+import { checkDistrictTheatres } from "./sources/district.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = path.join(rootDir, "config.json");
@@ -17,63 +17,115 @@ function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function buildOpenMessage(config) {
+function buildNewTheatresMessage(movieConfig, newTheatres) {
   return [
-    `${config.movie} ticket booking appears to be open on District for ${config.city}.`,
+    `New District theatres for ${movieConfig.title}:`,
+    ...newTheatres.map((theatre) => `- ${theatre.name}`),
     "",
-    `District: ${config.district.url}`,
-    `BookMyShow: ${config.bookmyshow.url}`,
-    "BookMyShow is not auto-checked; verify there too.",
+    `District: ${movieConfig.district.url}`,
+    `BookMyShow: ${movieConfig.bookmyshow.url}`,
+    "BookMyShow is not auto-checked; check there too.",
   ].join("\n");
 }
 
-function buildBrokenMessage(config, result, state) {
+function buildBrokenMessage(movieConfig, result, movieState) {
   return [
-    `District status has been unknown for ${state.district.unknownStreak} consecutive checks.`,
+    `District status has been unknown for ${movieState.district.unknownStreak} consecutive checks.`,
     `Latest reason: ${result.reason}`,
     "",
-    `Check manually: ${config.district.url}`,
+    `Check manually: ${movieConfig.district.url}`,
   ].join("\n");
+}
+
+function assertConfigAndState(config, state) {
+  if (!Array.isArray(config.movies)) {
+    throw new Error("config.json must contain a movies array");
+  }
+
+  for (const movieConfig of config.movies) {
+    if (!movieConfig.id) {
+      throw new Error("Each configured movie must have an id");
+    }
+
+    if (!state[movieConfig.id]?.district) {
+      throw new Error(`state.json is missing district state for movie id ${movieConfig.id}`);
+    }
+
+    if (!Array.isArray(state[movieConfig.id].district.knownTheatres)) {
+      throw new Error(
+        `state.json district.knownTheatres must be an array for movie id ${movieConfig.id}`,
+      );
+    }
+  }
+}
+
+async function handleUnknownDistrictResult(config, movieConfig, movieState, result) {
+  movieState.district.unknownStreak += 1;
+
+  if (
+    movieState.district.unknownStreak >= config.unknownStreakAlertThreshold &&
+    !movieState.district.brokenAlertSent
+  ) {
+    await notify({
+      title: `ticket-watch: District check may be broken for ${movieConfig.title}`,
+      message: buildBrokenMessage(movieConfig, result, movieState),
+      url: movieConfig.district.url,
+    });
+
+    movieState.district.brokenAlertSent = true;
+  }
+}
+
+async function handleOkDistrictResult(movieConfig, movieState, result) {
+  movieState.district.unknownStreak = 0;
+  movieState.district.brokenAlertSent = false;
+
+  const knownTheatres = new Set(movieState.district.knownTheatres);
+  const newTheatres = result.theatres.filter((theatre) => !knownTheatres.has(theatre.key));
+
+  if (newTheatres.length === 0) {
+    return newTheatres;
+  }
+
+  await notify({
+    title: `${movieConfig.title} tickets just opened at ${newTheatres.length} theatre(s)!`,
+    message: buildNewTheatresMessage(movieConfig, newTheatres),
+    url: movieConfig.district.url,
+  });
+
+  movieState.district.knownTheatres.push(
+    ...newTheatres.map((theatre) => theatre.key),
+  );
+
+  return newTheatres;
 }
 
 async function run() {
   const config = await readJson(configPath);
   const state = await readJson(statePath);
   const before = stableJson(state);
-  const result = await checkDistrict(config);
 
-  if (result.status === "open") {
-    if (!state.district.open) {
-      await notify({
-        title: `${config.movie} tickets are OPEN (District)`,
-        message: buildOpenMessage(config),
-        url: config.district.url,
-      });
+  assertConfigAndState(config, state);
 
-      state.district.open = true;
-      state.district.notifiedAt = new Date().toISOString();
+  for (const movieConfig of config.movies) {
+    const movieState = state[movieConfig.id];
+    const result = await checkDistrictTheatres(movieConfig);
+    let newTheatreCount = 0;
+
+    if (result.status === "ok") {
+      const newTheatres = await handleOkDistrictResult(
+        movieConfig,
+        movieState,
+        result,
+      );
+      newTheatreCount = newTheatres.length;
+    } else {
+      await handleUnknownDistrictResult(config, movieConfig, movieState, result);
     }
 
-    state.district.unknownStreak = 0;
-  } else if (result.status === "closed") {
-    state.district.open = false;
-    state.district.unknownStreak = 0;
-    state.district.brokenAlertSent = false;
-  } else {
-    state.district.unknownStreak += 1;
-
-    if (
-      state.district.unknownStreak >= config.unknownStreakAlertThreshold &&
-      !state.district.brokenAlertSent
-    ) {
-      await notify({
-        title: "ticket-watch: District check may be broken",
-        message: buildBrokenMessage(config, result, state),
-        url: config.district.url,
-      });
-
-      state.district.brokenAlertSent = true;
-    }
+    console.log(
+      `[${new Date().toISOString()}] ${movieConfig.id} district=${result.status} newTheatres=${newTheatreCount} knownTheatres=${movieState.district.knownTheatres.length} reason=${result.reason}`,
+    );
   }
 
   const after = stableJson(state);
@@ -81,10 +133,6 @@ async function run() {
   if (after !== before) {
     await writeFile(statePath, after);
   }
-
-  console.log(
-    `[${new Date().toISOString()}] district=${result.status} unknownStreak=${state.district.unknownStreak} reason=${result.reason}`,
-  );
 }
 
 run().catch((error) => {

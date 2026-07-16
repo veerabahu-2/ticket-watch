@@ -3,12 +3,8 @@ const USER_AGENT =
 
 const FETCH_TIMEOUT_MS = 15_000;
 
-const NEXT_DATA_RE =
-  /<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s;
-
-function findIndicator(text, indicators = []) {
-  return indicators.find((indicator) => indicator && text.includes(indicator));
-}
+const JSON_LD_RE =
+  /<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
 
 function errorMessage(error) {
   if (error?.name === "AbortError") {
@@ -18,42 +14,76 @@ function errorMessage(error) {
   return error?.message || String(error);
 }
 
-// District's Next.js page embeds real showtime data at this path. It's an
-// empty object before booking opens and gets populated with cinema/session
-// entries the moment tickets go on sale — far more reliable than matching
-// marketing copy, which can be reworded without notice.
-function readSessionsFromNextData(html, contentId) {
-  const match = html.match(NEXT_DATA_RE);
-  if (!match) {
-    return { found: false };
-  }
-
-  let data;
-  try {
-    data = JSON.parse(match[1]);
-  } catch {
-    return { found: false };
-  }
-
-  const mdp = data?.props?.pageProps?.initialState?.mdpV2;
-  if (!mdp || typeof mdp.sessions !== "object" || mdp.sessions === null) {
-    return { found: false };
-  }
-
-  const movieData = mdp.movieData?.[contentId];
-  if (!movieData) {
-    return { found: false };
-  }
-
-  return { found: true, sessionCount: Object.keys(mdp.sessions).length };
+function hasType(item, type) {
+  const itemType = item?.["@type"];
+  return Array.isArray(itemType) ? itemType.includes(type) : itemType === type;
 }
 
-export async function checkDistrict(config) {
+function flattenJsonLd(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(flattenJsonLd);
+  }
+
+  if (value && typeof value === "object") {
+    const graph = value["@graph"];
+    return graph ? [value, ...flattenJsonLd(graph)] : [value];
+  }
+
+  return [];
+}
+
+function parseJsonLdBlocks(html) {
+  const blocks = [];
+
+  for (const match of html.matchAll(JSON_LD_RE)) {
+    try {
+      blocks.push(...flattenJsonLd(JSON.parse(match[1].trim())));
+    } catch {
+      // A single malformed JSON-LD script should not invalidate the page.
+    }
+  }
+
+  return blocks;
+}
+
+function collectTheatres(blocks) {
+  const theatresByKey = new Map();
+  let screeningEventCount = 0;
+
+  for (const block of blocks) {
+    if (!hasType(block, "ScreeningEvent")) {
+      continue;
+    }
+
+    screeningEventCount += 1;
+
+    const location = Array.isArray(block.location)
+      ? block.location[0]
+      : block.location;
+    const key = location?.url || location?.name;
+
+    if (!key || theatresByKey.has(key)) {
+      continue;
+    }
+
+    theatresByKey.set(key, {
+      key,
+      name: location?.name || key,
+    });
+  }
+
+  return {
+    screeningEventCount,
+    theatres: [...theatresByKey.values()],
+  };
+}
+
+export async function checkDistrictTheatres(movieConfig) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(config.district.url, {
+    const response = await fetch(movieConfig.district.url, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept:
@@ -65,48 +95,32 @@ export async function checkDistrict(config) {
     if (!response.ok) {
       return {
         status: "unknown",
+        theatres: [],
         reason: `HTTP ${response.status} ${response.statusText}`.trim(),
       };
     }
 
-    const text = await response.text();
+    const blocks = parseJsonLdBlocks(await response.text());
 
-    // Primary signal: the embedded session data, which is authoritative and
-    // structural rather than text that marketing copy could reword.
-    const sessions = readSessionsFromNextData(text, config.district.contentId);
-    if (sessions.found) {
-      return sessions.sessionCount > 0
-        ? { status: "open", reason: `${sessions.sessionCount} session entries present` }
-        : { status: "closed", reason: "sessions object is empty" };
-    }
-
-    // Fallback: __NEXT_DATA__ shape changed or wasn't present. Fall back to
-    // matching copy on the page so a structural change doesn't go unnoticed
-    // (it still surfaces as "unknown" below, which triggers the broken-check
-    // alert after enough consecutive misses).
-    const openIndicator = findIndicator(text, config.district.openIndicators);
-    if (openIndicator) {
+    if (!blocks.some((block) => hasType(block, "Movie"))) {
       return {
-        status: "open",
-        reason: `matched open indicator (fallback): ${openIndicator}`,
+        status: "unknown",
+        theatres: [],
+        reason: "no Movie JSON-LD block found (page shape may have changed)",
       };
     }
 
-    const closedIndicator = findIndicator(text, config.district.closedIndicators);
-    if (closedIndicator) {
-      return {
-        status: "closed",
-        reason: `matched closed indicator (fallback): ${closedIndicator}`,
-      };
-    }
+    const { screeningEventCount, theatres } = collectTheatres(blocks);
 
     return {
-      status: "unknown",
-      reason: "no session data and no configured text indicator matched",
+      status: "ok",
+      theatres,
+      reason: `${screeningEventCount} screening event(s) across ${theatres.length} theatre(s)`,
     };
   } catch (error) {
     return {
       status: "unknown",
+      theatres: [],
       reason: errorMessage(error),
     };
   } finally {
