@@ -1,0 +1,46 @@
+name: Poll tickets
+
+on:
+  schedule:
+    - cron: "*/7 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Poll District
+        run: node src/poll.js
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Commit state
+        run: |
+          if [ -z "$(git status --porcelain state.json)" ]; then
+            echo "state.json unchanged; skipping commit"
+            exit 0
+          fi
+
+          git config user.name "ticket-watch-bot"
+          git config user.email "ticket-watch-bot@users.noreply.github.com"
+          git add state.json
+          git commit -m "chore: update state [skip ci]"
+          git push

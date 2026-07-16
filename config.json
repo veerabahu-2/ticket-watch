@@ -3,7 +3,8 @@
   "city": "Chennai",
   "district": {
     "url": "https://www.district.in/movies/chennai-movie-tickets-MV188681",
-    "closedIndicators": ["Releasing 23 July 2026", "Releasing on"],
+    "contentId": "188681",
+    "closedIndicators": ["Jana Nayagan releases on 23 July 2026."],
     "openIndicators": ["Book tickets", "BOOK TICKETS", "Select showtime", "Book Now"]
   },
   "bookmyshow": {
