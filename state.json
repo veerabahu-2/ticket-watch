@@ -1,0 +1,8 @@
+{
+  "district": {
+    "open": false,
+    "notifiedAt": null,
+    "unknownStreak": 0,
+    "brokenAlertSent": false
+  }
+}

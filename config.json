@@ -1,0 +1,15 @@
+{
+  "movie": "Jana Nayagan",
+  "city": "Chennai",
+  "district": {
+    "url": "https://www.district.in/movies/chennai-movie-tickets-MV188681",
+    "closedIndicators": ["Releasing 23 July 2026", "Releasing on"],
+    "openIndicators": ["Book tickets", "BOOK TICKETS", "Select showtime", "Book Now"]
+  },
+  "bookmyshow": {
+    "url": "https://in.bookmyshow.com/movies/chennai/jana-nayagan/ET00430817",
+    "note": "Blocked by Cloudflare bot protection, not auto-checked. Link included in every alert as a manual-check nudge."
+  },
+  "pollIntervalCron": "*/7 * * * *",
+  "unknownStreakAlertThreshold": 6
+}

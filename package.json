@@ -1,0 +1,13 @@
+{
+  "name": "ticket-watch",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Polls District for Jana Nayagan (Chennai) booking status and pushes a phone notification the moment it opens.",
+  "scripts": {
+    "poll": "node src/poll.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
