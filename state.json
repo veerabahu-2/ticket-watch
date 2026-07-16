@@ -1,8 +1,16 @@
 {
-  "district": {
-    "open": false,
-    "notifiedAt": null,
-    "unknownStreak": 0,
-    "brokenAlertSent": false
+  "jana-nayagan": {
+    "district": {
+      "knownTheatres": [],
+      "unknownStreak": 0,
+      "brokenAlertSent": false
+    }
+  },
+  "spider-man-brand-new-day": {
+    "district": {
+      "knownTheatres": [],
+      "unknownStreak": 0,
+      "brokenAlertSent": false
+    }
   }
 }
