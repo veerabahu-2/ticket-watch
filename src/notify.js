@@ -24,35 +24,46 @@ async function postNtfy({ title, message, url }) {
 
 async function postTelegram({ title, message, url }) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatIds = (process.env.TELEGRAM_CHAT_ID || "")
+    .split(",")
+    .map((chatId) => chatId.trim())
+    .filter(Boolean);
 
-  if (!token || !chatId) {
+  if (!token || chatIds.length === 0) {
     console.warn(
-      "Skipping Telegram notification: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is unset",
+      "Skipping Telegram notification: TELEGRAM_BOT_TOKEN is unset or no TELEGRAM_CHAT_ID chat ids are configured",
     );
     return;
   }
 
   const text = `${title}\n\n${message}${url ? `\n${url}` : ""}`;
-  const response = await fetch(
-    `https://api.telegram.org/bot${token}/sendMessage`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-      }),
-    },
-  );
+  for (const chatId of chatIds) {
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${token}/sendMessage`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+          }),
+        },
+      );
 
-  if (!response.ok) {
-    const responseText = await response.text().catch(() => "");
-    throw new Error(
-      `Telegram returned HTTP ${response.status} ${response.statusText}: ${responseText}`,
-    );
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => "");
+        console.error(
+          `Telegram notification failed for chat_id ${chatId}: HTTP ${response.status} ${response.statusText}: ${responseText}`,
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Telegram notification failed for chat_id ${chatId}: ${error?.stack || error?.message || error}`,
+      );
+    }
   }
 }
 
