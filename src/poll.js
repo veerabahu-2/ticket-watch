@@ -17,10 +17,9 @@ function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function buildNewTheatresMessage(movieConfig, newTheatres) {
+function buildNewTheatreMessage(movieConfig, theatre) {
   return [
-    `New District theatres for ${movieConfig.title}:`,
-    ...newTheatres.map((theatre) => `- ${theatre.name}`),
+    `${movieConfig.title} tickets just opened at ${theatre.name}.`,
     "",
     `District: ${movieConfig.district.url}`,
     `BookMyShow: ${movieConfig.bookmyshow.url}`,
@@ -87,11 +86,13 @@ async function handleOkDistrictResult(movieConfig, movieState, result) {
     return newTheatres;
   }
 
-  await notify({
-    title: `${movieConfig.title} tickets just opened at ${newTheatres.length} theatre(s)!`,
-    message: buildNewTheatresMessage(movieConfig, newTheatres),
-    url: movieConfig.district.url,
-  });
+  for (const theatre of newTheatres) {
+    await notify({
+      title: `${movieConfig.title} tickets just opened at ${theatre.name}!`,
+      message: buildNewTheatreMessage(movieConfig, theatre),
+      url: movieConfig.district.url,
+    });
+  }
 
   movieState.district.knownTheatres.push(
     ...newTheatres.map((theatre) => theatre.key),
