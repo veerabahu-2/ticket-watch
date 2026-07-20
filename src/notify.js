@@ -2,6 +2,10 @@ async function postNtfy({ title, message, url }) {
   const topic = process.env.NTFY_TOPIC;
 
   if (!topic) {
+    if (process.env.REQUIRE_NTFY === "true") {
+      throw new Error("NTFY_TOPIC is required but unset");
+    }
+
     console.warn("Skipping ntfy notification: NTFY_TOPIC is unset");
     return;
   }
@@ -30,6 +34,12 @@ async function postTelegram({ title, message, url }) {
     .filter(Boolean);
 
   if (!token || chatIds.length === 0) {
+    if (process.env.REQUIRE_TELEGRAM === "true") {
+      throw new Error(
+        "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required but unset",
+      );
+    }
+
     console.warn(
       "Skipping Telegram notification: TELEGRAM_BOT_TOKEN is unset or no TELEGRAM_CHAT_ID chat ids are configured",
     );
@@ -37,6 +47,8 @@ async function postTelegram({ title, message, url }) {
   }
 
   const text = `${title}\n\n${message}${url ? `\n${url}` : ""}`;
+  const failures = [];
+
   for (const chatId of chatIds) {
     try {
       const response = await fetch(
@@ -55,31 +67,58 @@ async function postTelegram({ title, message, url }) {
 
       if (!response.ok) {
         const responseText = await response.text().catch(() => "");
-        console.error(
-          `Telegram notification failed for chat_id ${chatId}: HTTP ${response.status} ${response.statusText}: ${responseText}`,
+        failures.push(
+          new Error(
+            `chat_id ${chatId}: HTTP ${response.status} ${response.statusText}: ${responseText}`,
+          ),
         );
       }
     } catch (error) {
-      console.error(
-        `Telegram notification failed for chat_id ${chatId}: ${error?.stack || error?.message || error}`,
+      failures.push(
+        new Error(
+          `chat_id ${chatId}: ${error?.stack || error?.message || error}`,
+        ),
       );
     }
   }
-}
 
-async function attempt(channelName, send) {
-  try {
-    await send();
-  } catch (error) {
-    console.error(
-      `${channelName} notification failed: ${error?.stack || error?.message || error}`,
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `Telegram notification failed for ${failures.length} chat(s)`,
     );
   }
 }
 
 export async function notify({ title, message, url }) {
-  await Promise.all([
-    attempt("ntfy", () => postNtfy({ title, message, url })),
-    attempt("Telegram", () => postTelegram({ title, message, url })),
-  ]);
+  const channels = [
+    ["ntfy", () => postNtfy({ title, message, url })],
+    ["Telegram", () => postTelegram({ title, message, url })],
+  ];
+  const results = await Promise.allSettled(
+    channels.map(([, send]) => send()),
+  );
+  const failures = results.flatMap((result, index) => {
+    if (result.status === "fulfilled") {
+      return [];
+    }
+
+    const channelName = channels[index][0];
+    console.error(
+      `${channelName} notification failed: ${result.reason?.stack || result.reason?.message || result.reason}`,
+    );
+
+    return [
+      new Error(`${channelName} notification failed`, {
+        cause: result.reason,
+      }),
+    ];
+  });
+
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `${failures.length} notification channel(s) failed`,
+    );
+  }
 }

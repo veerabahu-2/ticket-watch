@@ -78,7 +78,49 @@ function collectTheatres(blocks) {
   };
 }
 
+function slugify(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function validateDistrictMovieConfig(movieConfig) {
+  const city = slugify(movieConfig.city);
+  const contentId = String(movieConfig.district?.contentId || "").trim();
+  let url;
+
+  try {
+    url = new URL(movieConfig.district?.url);
+  } catch {
+    throw new Error(`District URL is invalid for movie id ${movieConfig.id}`);
+  }
+
+  const expectedSuffix = `-movie-tickets-in-${city}-MV${contentId}`;
+
+  if (
+    url.hostname !== "www.district.in" ||
+    !contentId ||
+    !url.pathname.endsWith(expectedSuffix)
+  ) {
+    throw new Error(
+      `District URL for movie id ${movieConfig.id} must be the city-specific showtimes URL ending in ${expectedSuffix}`,
+    );
+  }
+}
+
 export async function checkDistrictTheatres(movieConfig) {
+  try {
+    validateDistrictMovieConfig(movieConfig);
+  } catch (error) {
+    return {
+      status: "unknown",
+      theatres: [],
+      reason: errorMessage(error),
+    };
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 

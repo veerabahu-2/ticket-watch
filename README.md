@@ -12,8 +12,10 @@ Project folder:
 
 ## How it works
 
-- `.github/workflows/poll.yml` runs `src/poll.js` on a schedule (every 7
-  minutes) via GitHub Actions — independent of any local machine being on.
+- `.github/workflows/poll.yml` requests a run every 7 minutes via GitHub
+  Actions — independent of any local machine being on. The schedule starts at
+  minute 3 to avoid GitHub's highest-load time at the start of each hour.
+  GitHub schedules are best-effort and can still be delayed or dropped.
 - `src/sources/district.js` fetches each movie's District page and parses
   the server-rendered `<script type="application/ld+json">` blocks. A movie
   page with open bookings has one `ScreeningEvent` block per showtime, each
@@ -34,14 +36,13 @@ Project folder:
   plus a consecutive-"unknown"-checks counter that fires a one-time "this
   might be broken, go check manually" alert if District's page structure
   changes underneath the script.
-- Each poll checks every movie in `config.json`'s `movies` array. If a
-  movie's newly-open theatres are found, they're batched into **one**
-  notification per movie per poll (not one push per theatre) — otherwise a
-  release opening city-wide in a single poll would fire dozens of pushes at
-  once. A theatre that opens later, in a subsequent poll, gets its own
-  separate notification.
+- Each poll checks every movie in `config.json`'s `movies` array and sends one
+  notification per newly-opened theatre.
 - Notifications go out on both ntfy and Telegram from the same run, via
-  `src/notify.js`. Either channel failing doesn't block the other.
+  `src/notify.js`. Both channels are attempted independently. Any configured
+  channel failure fails the poll so the theatre is not marked as notified and
+  the next poll retries it. The GitHub workflow also requires both channels'
+  secrets instead of silently skipping a channel when a secret is missing.
 
 ## Setup
 
@@ -71,6 +72,10 @@ set means notifications are skipped with a warning (safe to dry-run).
 District URL, e.g. `MV188681` → `188681`), and `bookmyshow: { url, note }`
 for the manual-check link. `pollIntervalCron` and
 `unknownStreakAlertThreshold` apply to every movie.
+
+The District URL must be the city-specific showtimes URL, for example
+`.../jana-nayagan-movie-tickets-in-chennai-MV188681`. Generic movie landing
+URLs are rejected because they can look healthy while omitting all showtimes.
 
 `state.json` is keyed by movie `id`, each holding
 `district.knownTheatres` (theatre keys already notified), `unknownStreak`,

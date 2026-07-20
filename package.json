@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Polls District for Jana Nayagan (Chennai) booking status and pushes a phone notification the moment it opens.",
   "scripts": {
-    "poll": "node src/poll.js"
+    "poll": "node src/poll.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"

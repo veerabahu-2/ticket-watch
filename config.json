@@ -5,7 +5,7 @@
       "title": "Jana Nayagan",
       "city": "Chennai",
       "district": {
-        "url": "https://www.district.in/movies/chennai-movie-tickets-MV188681",
+        "url": "https://www.district.in/movies/jana-nayagan-movie-tickets-in-chennai-MV188681",
         "contentId": "188681"
       },
       "bookmyshow": {
@@ -18,7 +18,7 @@
       "title": "Spider-Man: Brand New Day",
       "city": "Chennai",
       "district": {
-        "url": "https://www.district.in/movies/spider-man-brand-new-day-movie-tickets-MV194537",
+        "url": "https://www.district.in/movies/spider-man-brand-new-day-movie-tickets-in-chennai-MV194537",
         "contentId": "194537"
       },
       "bookmyshow": {
@@ -27,6 +27,6 @@
       }
     }
   ],
-  "pollIntervalCron": "*/7 * * * *",
+  "pollIntervalCron": "3/7 * * * *",
   "unknownStreakAlertThreshold": 6
 }

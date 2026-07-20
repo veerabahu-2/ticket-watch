@@ -2,7 +2,8 @@ name: Poll tickets
 
 on:
   schedule:
-    - cron: "*/7 * * * *"
+    # Avoid minute 0, when GitHub documents the highest scheduler load.
+    - cron: "3/7 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -31,6 +32,8 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REQUIRE_NTFY: "true"
+          REQUIRE_TELEGRAM: "true"
 
       - name: Commit state
         run: |

@@ -3,7 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { notify } from "./notify.js";
-import { checkDistrictTheatres } from "./sources/district.js";
+import {
+  checkDistrictTheatres,
+  validateDistrictMovieConfig,
+} from "./sources/district.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = path.join(rootDir, "config.json");
@@ -45,6 +48,8 @@ function assertConfigAndState(config, state) {
     if (!movieConfig.id) {
       throw new Error("Each configured movie must have an id");
     }
+
+    validateDistrictMovieConfig(movieConfig);
 
     if (!state[movieConfig.id]?.district) {
       throw new Error(`state.json is missing district state for movie id ${movieConfig.id}`);
