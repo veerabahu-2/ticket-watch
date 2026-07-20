@@ -1,14 +1,27 @@
 {
   "jana-nayagan": {
     "district": {
-      "knownTheatres": [],
+      "knownTheatres": [
+        "https://www.district.in/movies/devi-cineplex-anna-salai-chennai-c/4184",
+        "https://www.district.in/movies/ega-cinemas-rgb-laser-dolby-audio-couple-sofa-kilpauk-chennai-c/1042615",
+        "https://www.district.in/movies/santhalinga-cinemas-multiplex-dolby-atmos-4k-laser-oragadam-c/1102078",
+        "https://www.district.in/movies/woodlands-complex-royapettah-chennai-c/1010362",
+        "https://www.district.in/movies/nadhamuni-cinema-villivakkam-chennai-c/3981",
+        "https://www.district.in/movies/casino-cinemas-pure-rgb-laser-dolby-atmos-couple-seats-mount-road-chennai-c/1036962",
+        "https://www.district.in/movies/vidya-theatre-4k-dolby-atmos-tambaram-w-chennai-c/1037496",
+        "https://www.district.in/movies/meenakshi-cinemas-a-c-rgb-laser-dts-x-manali-chennai-c/1030504",
+        "https://www.district.in/movies/c3-cinemas-rohini-rgb-laser-dolby-atmos-mamandur-c/1102116",
+        "https://www.district.in/movies/kasi-rgb-laser-dolby-atmos-ashok-nagar-chennai-c/3943"
+      ],
       "unknownStreak": 0,
       "brokenAlertSent": false
     }
   },
   "spider-man-brand-new-day": {
     "district": {
-      "knownTheatres": [],
+      "knownTheatres": [
+        "https://www.district.in/movies/moviemax-pr-mall-wall-tax-road-chennai-c/1102281"
+      ],
       "unknownStreak": 0,
       "brokenAlertSent": false
     }
