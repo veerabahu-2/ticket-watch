@@ -4,6 +4,9 @@ Watches District for ticket booking to open on a configured list of movies
 (Chennai), theatre by theatre, and pushes a phone notification via ntfy +
 Telegram naming exactly which theatre(s) just opened.
 
+> Monitoring is currently stopped: no movies are configured and the GitHub
+> Actions workflow has no scheduled trigger.
+
 Project folder:
 
 ```text

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Polls District for Jana Nayagan (Chennai) booking status and pushes a phone notification the moment it opens.",
+  "description": "Polls District for configured movie booking availability and sends notifications.",
   "scripts": {
     "poll": "node src/poll.js",
     "test": "node --test"

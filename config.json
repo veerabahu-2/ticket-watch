@@ -1,32 +1,5 @@
 {
-  "movies": [
-    {
-      "id": "jana-nayagan",
-      "title": "Jana Nayagan",
-      "city": "Chennai",
-      "district": {
-        "url": "https://www.district.in/movies/jana-nayagan-movie-tickets-in-chennai-MV188681",
-        "contentId": "188681"
-      },
-      "bookmyshow": {
-        "url": "https://in.bookmyshow.com/movies/chennai/jana-nayagan/ET00430817",
-        "note": "Blocked by Cloudflare bot protection, not auto-checked. Link included in every alert as a manual-check nudge."
-      }
-    },
-    {
-      "id": "spider-man-brand-new-day",
-      "title": "Spider-Man: Brand New Day",
-      "city": "Chennai",
-      "district": {
-        "url": "https://www.district.in/movies/spider-man-brand-new-day-movie-tickets-in-chennai-MV194537",
-        "contentId": "194537"
-      },
-      "bookmyshow": {
-        "url": "https://in.bookmyshow.com/movies/chennai/spider-man-brand-new-day/ET00447840",
-        "note": "Blocked by Cloudflare bot protection, not auto-checked. Link included in every alert as a manual-check nudge."
-      }
-    }
-  ],
+  "movies": [],
   "pollIntervalCron": "3/7 * * * *",
   "unknownStreakAlertThreshold": 6
 }

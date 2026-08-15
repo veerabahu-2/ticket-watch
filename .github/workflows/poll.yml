@@ -1,9 +1,6 @@
 name: Poll tickets
 
 on:
-  schedule:
-    # Avoid minute 0, when GitHub documents the highest scheduler load.
-    - cron: "3/7 * * * *"
   workflow_dispatch:
 
 permissions:
