@@ -183,3 +183,47 @@ test("keeps checking when the movie is not listed in the District catalogue yet"
   assert.match(result.reason, /not listed/);
   assert.equal(fetchCount, 1);
 });
+
+test("uses the reader fallback when District blocks the cloud request", async () => {
+  const catalogueUrl = "https://www.district.in/movies/chennai-movie-tickets";
+  const showtimesUrl =
+    "https://www.district.in/movies/avengers-endgame-encore-movie-tickets-in-chennai-MV123";
+  const readerBase = "https://r.jina.ai/";
+  const fetchedUrls = [];
+  globalThis.fetch = async (url) => {
+    fetchedUrls.push(url);
+
+    if (url === catalogueUrl || url === showtimesUrl) {
+      return new Response("blocked", { status: 403, statusText: "Forbidden" });
+    }
+
+    if (url === `${readerBase}${catalogueUrl}`) {
+      return new Response(
+        `[Avengers Endgame: Encore](${showtimesUrl})`,
+        { status: 200 },
+      );
+    }
+
+    return new Response(
+      "[Cinema One](https://www.district.in/movies/cinema-one-in-chennai-CD123)",
+      { status: 200 },
+    );
+  };
+
+  const result = await checkDistrictTheatres(discoveryMovieConfig());
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.url, showtimesUrl);
+  assert.deepEqual(result.theatres, [
+    {
+      key: "https://www.district.in/movies/cinema-one-in-chennai-CD123",
+      name: "Cinema One",
+    },
+  ]);
+  assert.deepEqual(fetchedUrls, [
+    catalogueUrl,
+    `${readerBase}${catalogueUrl}`,
+    showtimesUrl,
+    `${readerBase}${showtimesUrl}`,
+  ]);
+});

@@ -34,6 +34,9 @@ Project folder:
 - If District has not yet published the movie's individual Chennai page, the
   monitor discovers it from the Chennai movie catalogue on every poll. It
   begins theatre-level checking automatically once the page appears.
+- If District blocks GitHub Actions directly, the monitor retries the same
+  public District page through Jina Reader. This fallback only receives the
+  public District URL and keeps the cloud monitor usable without credentials.
 - BookMyShow is **not** auto-checked — its site returns a Cloudflare 403 to
   any non-browser request, confirmed by testing. Its link is included in
   every notification as a manual-check nudge instead, since both platforms

@@ -2,6 +2,7 @@ const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 const FETCH_TIMEOUT_MS = 15_000;
+const READER_BASE_URL = "https://r.jina.ai/";
 
 const JSON_LD_RE =
   /<script\b[^>]*\btype\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -93,6 +94,43 @@ function normalizeTitle(value) {
     .trim();
 }
 
+function collectReaderTheatres(markdown) {
+  const theatresByKey = new Map();
+  const cinemaUrlRe =
+    /\[([^\]]+)\]\((https:\/\/www\.district\.in\/movies\/[^)\s]+-in-[^)\s]+-CD\d+)\)/g;
+
+  for (const match of markdown.matchAll(cinemaUrlRe)) {
+    const [, name, key] = match;
+
+    if (!theatresByKey.has(key)) {
+      theatresByKey.set(key, { key, name: name.trim() });
+    }
+  }
+
+  return [...theatresByKey.values()];
+}
+
+function findReaderMovieUrl(markdown, movieConfig) {
+  const city = slugify(movieConfig.city);
+  const title = normalizeTitle(movieConfig.district.movieTitle);
+  const movieUrlRe = new RegExp(
+    `https://www\\.district\\.in/movies/[^)\\s]+-movie-tickets-in-${city}-MV\\d+`,
+    "g",
+  );
+
+  for (const match of markdown.matchAll(movieUrlRe)) {
+    const url = match[0];
+    const slug = decodeURIComponent(url.split("/").pop() || "")
+      .replace(/-movie-tickets-in-[^-]+-MV\d+$/, "");
+
+    if (normalizeTitle(slug) === title) {
+      return url;
+    }
+  }
+
+  return undefined;
+}
+
 function validateDistrictUrl(urlString, movieConfig) {
   const city = slugify(movieConfig.city);
   const contentId = String(movieConfig.district?.contentId || "").trim();
@@ -156,6 +194,24 @@ async function fetchDistrictPage(url) {
     });
 
     if (!response.ok) {
+      if (response.status === 403) {
+        const readerResponse = await fetch(`${READER_BASE_URL}${url}`);
+
+        if (!readerResponse.ok) {
+          return {
+            status: "unknown",
+            theatres: [],
+            reason: `District returned HTTP 403 and reader fallback returned HTTP ${readerResponse.status} ${readerResponse.statusText}`.trim(),
+          };
+        }
+
+        return {
+          status: "ok",
+          readerText: await readerResponse.text(),
+          source: "reader fallback",
+        };
+      }
+
       return {
         status: "unknown",
         theatres: [],
@@ -166,6 +222,7 @@ async function fetchDistrictPage(url) {
     return {
       status: "ok",
       blocks: parseJsonLdBlocks(await response.text()),
+      source: "District",
     };
   } catch (error) {
     return {
@@ -182,6 +239,16 @@ async function checkShowtimes(url) {
 
   if (page.status !== "ok") {
     return { ...page, theatres: [] };
+  }
+
+  if (page.readerText) {
+    const theatres = collectReaderTheatres(page.readerText);
+
+    return {
+      status: "ok",
+      theatres,
+      reason: `reader fallback found ${theatres.length} theatre(s)`,
+    };
   }
 
   const { blocks } = page;
@@ -210,6 +277,24 @@ async function discoverDistrictMovieUrl(movieConfig) {
     return {
       ...page,
       theatres: [],
+    };
+  }
+
+  if (page.readerText) {
+    const url = findReaderMovieUrl(page.readerText, movieConfig);
+
+    if (!url) {
+      return {
+        status: "ok",
+        theatres: [],
+        reason: "movie is not listed in the District Chennai catalogue yet",
+        url: movieConfig.district.discoveryUrl,
+      };
+    }
+
+    return {
+      ...(await checkShowtimes(url)),
+      url,
     };
   }
 
