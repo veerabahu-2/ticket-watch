@@ -25,8 +25,7 @@ function flattenJsonLd(value) {
   }
 
   if (value && typeof value === "object") {
-    const graph = value["@graph"];
-    return graph ? [value, ...flattenJsonLd(graph)] : [value];
+    return [value, ...Object.values(value).flatMap(flattenJsonLd)];
   }
 
   return [];
@@ -86,13 +85,21 @@ function slugify(value) {
     .replace(/^-|-$/g, "");
 }
 
-export function validateDistrictMovieConfig(movieConfig) {
+function normalizeTitle(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function validateDistrictUrl(urlString, movieConfig) {
   const city = slugify(movieConfig.city);
   const contentId = String(movieConfig.district?.contentId || "").trim();
   let url;
 
   try {
-    url = new URL(movieConfig.district?.url);
+    url = new URL(urlString);
   } catch {
     throw new Error(`District URL is invalid for movie id ${movieConfig.id}`);
   }
@@ -110,22 +117,36 @@ export function validateDistrictMovieConfig(movieConfig) {
   }
 }
 
-export async function checkDistrictTheatres(movieConfig) {
-  try {
-    validateDistrictMovieConfig(movieConfig);
-  } catch (error) {
-    return {
-      status: "unknown",
-      theatres: [],
-      reason: errorMessage(error),
-    };
+export function validateDistrictMovieConfig(movieConfig) {
+  if (movieConfig.district?.url) {
+    validateDistrictUrl(movieConfig.district.url, movieConfig);
+    return;
   }
 
+  try {
+    const discoveryUrl = new URL(movieConfig.district?.discoveryUrl);
+    const expectedPath = `/movies/${slugify(movieConfig.city)}-movie-tickets`;
+
+    if (
+      discoveryUrl.hostname !== "www.district.in" ||
+      discoveryUrl.pathname !== expectedPath ||
+      !movieConfig.district?.movieTitle
+    ) {
+      throw new Error("invalid discovery configuration");
+    }
+  } catch {
+    throw new Error(
+      `District configuration for movie id ${movieConfig.id} must provide either a city-specific showtimes URL or a valid city catalogue discovery URL and movieTitle`,
+    );
+  }
+}
+
+async function fetchDistrictPage(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(movieConfig.district.url, {
+    const response = await fetch(url, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept:
@@ -142,30 +163,113 @@ export async function checkDistrictTheatres(movieConfig) {
       };
     }
 
-    const blocks = parseJsonLdBlocks(await response.text());
-
-    if (!blocks.some((block) => hasType(block, "Movie"))) {
-      return {
-        status: "unknown",
-        theatres: [],
-        reason: "no Movie JSON-LD block found (page shape may have changed)",
-      };
-    }
-
-    const { screeningEventCount, theatres } = collectTheatres(blocks);
-
     return {
       status: "ok",
-      theatres,
-      reason: `${screeningEventCount} screening event(s) across ${theatres.length} theatre(s)`,
+      blocks: parseJsonLdBlocks(await response.text()),
     };
+  } catch (error) {
+    return {
+      status: "unknown",
+      reason: errorMessage(error),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function checkShowtimes(url) {
+  const page = await fetchDistrictPage(url);
+
+  if (page.status !== "ok") {
+    return { ...page, theatres: [] };
+  }
+
+  const { blocks } = page;
+
+  if (!blocks.some((block) => hasType(block, "Movie"))) {
+    return {
+      status: "unknown",
+      theatres: [],
+      reason: "no Movie JSON-LD block found (page shape may have changed)",
+    };
+  }
+
+  const { screeningEventCount, theatres } = collectTheatres(blocks);
+
+  return {
+    status: "ok",
+    theatres,
+    reason: `${screeningEventCount} screening event(s) across ${theatres.length} theatre(s)`,
+  };
+}
+
+async function discoverDistrictMovieUrl(movieConfig) {
+  const page = await fetchDistrictPage(movieConfig.district.discoveryUrl);
+
+  if (page.status !== "ok") {
+    return {
+      ...page,
+      theatres: [],
+    };
+  }
+
+  const targetTitle = normalizeTitle(movieConfig.district.movieTitle);
+  const movie = page.blocks.find(
+    (block) =>
+      hasType(block, "Movie") &&
+      normalizeTitle(block.name) === targetTitle &&
+      typeof block.url === "string",
+  );
+
+  if (!movie) {
+    return {
+      status: "ok",
+      theatres: [],
+      reason: "movie is not listed in the District Chennai catalogue yet",
+      url: movieConfig.district.discoveryUrl,
+    };
+  }
+
+  try {
+    validateDistrictUrl(movie.url, {
+      ...movieConfig,
+      district: {
+        ...movieConfig.district,
+        url: movie.url,
+        contentId: movie.url.match(/MV(\d+)$/)?.[1],
+      },
+    });
+  } catch (error) {
+    return {
+      status: "unknown",
+      theatres: [],
+      reason: `District catalogue returned an invalid movie page: ${errorMessage(error)}`,
+    };
+  }
+
+  return {
+    ...(await checkShowtimes(movie.url)),
+    url: movie.url,
+  };
+}
+
+export async function checkDistrictTheatres(movieConfig) {
+  try {
+    validateDistrictMovieConfig(movieConfig);
   } catch (error) {
     return {
       status: "unknown",
       theatres: [],
       reason: errorMessage(error),
     };
-  } finally {
-    clearTimeout(timeout);
   }
+
+  if (movieConfig.district.url) {
+    return {
+      ...(await checkShowtimes(movieConfig.district.url)),
+      url: movieConfig.district.url,
+    };
+  }
+
+  return discoverDistrictMovieUrl(movieConfig);
 }

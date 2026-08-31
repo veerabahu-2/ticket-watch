@@ -27,7 +27,21 @@ function movieConfig(overrides = {}) {
   };
 }
 
-test("configured movies use city-specific District showtimes URLs", async () => {
+function discoveryMovieConfig(overrides = {}) {
+  return {
+    id: "avengers-endgame-encore-english",
+    title: "Avengers Endgame: Encore (English)",
+    city: "Chennai",
+    district: {
+      discoveryUrl: "https://www.district.in/movies/chennai-movie-tickets",
+      movieTitle: "Avengers Endgame: Encore",
+      ...overrides.district,
+    },
+    ...overrides,
+  };
+}
+
+test("configured movies have valid District configuration", async () => {
   const config = JSON.parse(
     await readFile(new URL("../config.json", import.meta.url), "utf8"),
   );
@@ -114,4 +128,58 @@ test("a page without Movie JSON-LD is reported as unknown", async () => {
 
   assert.equal(result.status, "unknown");
   assert.match(result.reason, /no Movie JSON-LD block/);
+});
+
+test("discovers a new movie page from the Chennai catalogue and checks it", async () => {
+  const showtimesUrl =
+    "https://www.district.in/movies/avengers-endgame-encore-movie-tickets-in-chennai-MV123";
+  const fetchedUrls = [];
+  globalThis.fetch = async (url) => {
+    fetchedUrls.push(url);
+
+    if (url === "https://www.district.in/movies/chennai-movie-tickets") {
+      return new Response(
+        `<script type="application/ld+json">
+          {"@type":"ItemList","itemListElement":[
+            {"@type":"ListItem","item":{"@type":"Movie","name":"Avengers Endgame: Encore","url":"${showtimesUrl}"}}
+          ]}
+        </script>`,
+        { status: 200 },
+      );
+    }
+
+    return new Response(
+      `<script type="application/ld+json">{"@type":"Movie","name":"Avengers Endgame: Encore"}</script>
+       <script type="application/ld+json">{"@type":"ScreeningEvent","location":{"name":"Cinema One","url":"https://district.in/cinema-one"}}</script>`,
+      { status: 200 },
+    );
+  };
+
+  const result = await checkDistrictTheatres(discoveryMovieConfig());
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.url, showtimesUrl);
+  assert.equal(result.theatres.length, 1);
+  assert.deepEqual(fetchedUrls, [
+    "https://www.district.in/movies/chennai-movie-tickets",
+    showtimesUrl,
+  ]);
+});
+
+test("keeps checking when the movie is not listed in the District catalogue yet", async () => {
+  let fetchCount = 0;
+  globalThis.fetch = async () => {
+    fetchCount += 1;
+    return new Response(
+      `<script type="application/ld+json">{"@type":"ItemList","itemListElement":[]}</script>`,
+      { status: 200 },
+    );
+  };
+
+  const result = await checkDistrictTheatres(discoveryMovieConfig());
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.theatres.length, 0);
+  assert.match(result.reason, /not listed/);
+  assert.equal(fetchCount, 1);
 });

@@ -1,6 +1,8 @@
 name: Poll tickets
 
 on:
+  schedule:
+    - cron: "3/7 * * * *"
   workflow_dispatch:
 
 permissions:

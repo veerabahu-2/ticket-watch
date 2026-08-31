@@ -20,11 +20,11 @@ function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function buildNewTheatreMessage(movieConfig, theatre) {
+function buildNewTheatreMessage(movieConfig, theatre, districtUrl) {
   return [
     `${movieConfig.title} tickets just opened at ${theatre.name}.`,
     "",
-    `District: ${movieConfig.district.url}`,
+    `District: ${districtUrl}`,
     `BookMyShow: ${movieConfig.bookmyshow.url}`,
     "BookMyShow is not auto-checked; check there too.",
   ].join("\n");
@@ -35,7 +35,7 @@ function buildBrokenMessage(movieConfig, result, movieState) {
     `District status has been unknown for ${movieState.district.unknownStreak} consecutive checks.`,
     `Latest reason: ${result.reason}`,
     "",
-    `Check manually: ${movieConfig.district.url}`,
+    `Check manually: ${result.url || movieConfig.district.url || movieConfig.district.discoveryUrl}`,
   ].join("\n");
 }
 
@@ -73,7 +73,7 @@ async function handleUnknownDistrictResult(config, movieConfig, movieState, resu
     await notify({
       title: `ticket-watch: District check may be broken for ${movieConfig.title}`,
       message: buildBrokenMessage(movieConfig, result, movieState),
-      url: movieConfig.district.url,
+      url: result.url || movieConfig.district.url || movieConfig.district.discoveryUrl,
     });
 
     movieState.district.brokenAlertSent = true;
@@ -94,8 +94,8 @@ async function handleOkDistrictResult(movieConfig, movieState, result) {
   for (const theatre of newTheatres) {
     await notify({
       title: `${movieConfig.title} tickets just opened at ${theatre.name}!`,
-      message: buildNewTheatreMessage(movieConfig, theatre),
-      url: movieConfig.district.url,
+      message: buildNewTheatreMessage(movieConfig, theatre, result.url),
+      url: result.url,
     });
   }
 

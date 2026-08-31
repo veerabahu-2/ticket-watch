@@ -1,5 +1,19 @@
 {
-  "movies": [],
+  "movies": [
+    {
+      "id": "avengers-endgame-encore-english",
+      "title": "Avengers Endgame: Encore (English)",
+      "city": "Chennai",
+      "district": {
+        "discoveryUrl": "https://www.district.in/movies/chennai-movie-tickets",
+        "movieTitle": "Avengers Endgame: Encore"
+      },
+      "bookmyshow": {
+        "url": "https://in.bookmyshow.com/movies/chennai/avengers-endgame-encore-english/ET00514163",
+        "note": "BookMyShow blocks cloud polling with a CAPTCHA. Use its native Interested notification for BookMyShow availability."
+      }
+    }
+  ],
   "pollIntervalCron": "3/7 * * * *",
   "unknownStreakAlertThreshold": 6
 }

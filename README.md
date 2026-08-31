@@ -4,8 +4,9 @@ Watches District for ticket booking to open on a configured list of movies
 (Chennai), theatre by theatre, and pushes a phone notification via ntfy +
 Telegram naming exactly which theatre(s) just opened.
 
-> Monitoring is currently stopped: no movies are configured and the GitHub
-> Actions workflow has no scheduled trigger.
+Avengers Endgame: Encore (English) is currently tracked for Chennai. District
+is checked automatically; use BookMyShow’s native **Interested** notification
+for BookMyShow availability, because it blocks cloud polling with a CAPTCHA.
 
 Project folder:
 
@@ -30,6 +31,9 @@ Project folder:
   that field turned out to be populated client-side after page load — even
   an already-open movie showed it empty on a plain fetch — so it was
   replaced with this structural signal.)
+- If District has not yet published the movie's individual Chennai page, the
+  monitor discovers it from the Chennai movie catalogue on every poll. It
+  begins theatre-level checking automatically once the page appears.
 - BookMyShow is **not** auto-checked — its site returns a Cloudflare 403 to
   any non-browser request, confirmed by testing. Its link is included in
   every notification as a manual-check nudge instead, since both platforms
