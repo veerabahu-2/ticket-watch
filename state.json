@@ -2,9 +2,6 @@
   "avengers-doomsday-chennai": {
     "district": {
       "knownTheatres": [
-        "https://www.district.in/movies/hdfc-millennia-pvr-escape-express-avenue-mall-chennai-c/1022257",
-        "https://www.district.in/movies/cinepolis-bsr-mall-omr-thoraipakkam-chennai-c/9505",
-        "https://www.district.in/movies/pvr-palazzo-the-nexus-vijaya-mall-chennai-c/1022274",
         "cinema:1022257",
         "cinema:9505",
         "cinema:1022274"
