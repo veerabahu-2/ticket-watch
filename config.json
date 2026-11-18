@@ -1,15 +1,15 @@
 {
   "movies": [
     {
-      "id": "avengers-endgame-encore-english",
-      "title": "Avengers Endgame: Encore (English)",
+      "id": "avengers-doomsday-chennai",
+      "title": "Avengers: Doomsday",
       "city": "Chennai",
       "district": {
-        "discoveryUrl": "https://www.district.in/movies/chennai-movie-tickets",
-        "movieTitle": "Avengers Endgame: Encore"
+        "url": "https://www.district.in/movies/avengers-doomsday-movie-tickets-in-chennai-MV176735",
+        "contentId": "176735"
       },
       "bookmyshow": {
-        "url": "https://in.bookmyshow.com/movies/chennai/avengers-endgame-encore-english/ET00514163",
+        "url": "https://in.bookmyshow.com/movies/chennai/avengers-doomsday/ET00439706",
         "note": "BookMyShow blocks cloud polling with a CAPTCHA. Use its native Interested notification for BookMyShow availability."
       }
     }
