@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { notify } from "./notify.js";
+import { notify, placeCall } from "./notify.js";
 import {
   checkDistrictTheatres,
   normalizeTheatreKey,
@@ -103,6 +103,18 @@ async function handleOkDistrictResult(movieConfig, movieState, result) {
   movieState.district.knownTheatres.push(
     ...newTheatres.map((theatre) => theatre.key),
   );
+
+  // The call is best effort: a failed call must not block saving state, or
+  // the next poll would resend every text alert.
+  try {
+    await placeCall({
+      speech: `${movieConfig.title} tickets just opened at ${newTheatres
+        .map((theatre) => theatre.name)
+        .join(", ")}. Book now on District.`,
+    });
+  } catch (error) {
+    console.error(`Phone call failed: ${error?.stack || error?.message || error}`);
+  }
 
   return newTheatres;
 }

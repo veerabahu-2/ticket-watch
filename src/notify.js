@@ -122,3 +122,35 @@ export async function notify({ title, message, url }) {
     );
   }
 }
+
+// Places one Bland AI phone call. Optional: skipped unless both BLAND_API_KEY
+// and BLAND_PHONE_NUMBER (E.164, e.g. +91...) are set.
+export async function placeCall({ speech }) {
+  const apiKey = process.env.BLAND_API_KEY;
+  const phoneNumber = process.env.BLAND_PHONE_NUMBER;
+
+  if (!apiKey || !phoneNumber) {
+    console.warn("Skipping phone call: BLAND_API_KEY or BLAND_PHONE_NUMBER is unset");
+    return;
+  }
+
+  const response = await fetch("https://api.bland.ai/v1/calls", {
+    method: "POST",
+    headers: {
+      authorization: apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      phone_number: phoneNumber,
+      first_sentence: speech,
+      task: `You are a ticket alert. Say this message, repeat it once if asked, then end the call: ${speech}`,
+      wait_for_greeting: false,
+      max_duration: 1,
+    }),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => "");
+    throw new Error(`Bland returned HTTP ${response.status} ${response.statusText}: ${responseText}`);
+  }
+}
