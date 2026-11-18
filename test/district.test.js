@@ -244,3 +244,38 @@ test("normalizeTheatreKey maps both District cinema URL formats to one key", () 
   );
   assert.equal(normalizeTheatreKey("cinema:1022274"), "cinema:1022274");
 });
+
+test("checkDistrictTheatres also finds theatres open only on later show dates", async () => {
+  const url = movieConfig().district.url;
+  const page = (cinemas, tabs) => {
+    const blocks = [
+      { "@type": "Movie", name: "Example" },
+      ...cinemas.map((id) => ({
+        "@type": "ScreeningEvent",
+        location: {
+          "@type": "MovieTheater",
+          name: `Cinema ${id}`,
+          url: `https://www.district.in/movies/cinema-${id}-chennai-c/${id}`,
+        },
+      })),
+    ];
+    const links = tabs.map((date) => `<a href="${url}?fromdate=${date}">${date}</a>`).join("");
+    return `${links}<script type="application/ld+json">${JSON.stringify(blocks)}</script>`;
+  };
+  const tabs = ["2026-12-17", "2026-12-18"];
+
+  globalThis.fetch = async (requested) => {
+    const body = String(requested).endsWith("fromdate=2026-12-18")
+      ? page([2], tabs)
+      : page([1], tabs);
+    return new Response(body, { status: 200 });
+  };
+
+  const result = await checkDistrictTheatres(movieConfig());
+
+  assert.equal(result.status, "ok");
+  assert.deepEqual(
+    result.theatres.map((theatre) => theatre.key).sort(),
+    ["cinema:1", "cinema:2"],
+  );
+});

@@ -195,6 +195,20 @@ export function validateDistrictMovieConfig(movieConfig) {
   }
 }
 
+const MAX_SHOW_DATES = 7;
+
+// The movie page lists only its first show date; each later date is a
+// separate ?fromdate= page, linked from the date tabs.
+function collectShowDates(text) {
+  const dates = new Set();
+
+  for (const match of text.matchAll(/fromdate=(\d{4}-\d{2}-\d{2})/g)) {
+    dates.add(match[1]);
+  }
+
+  return [...dates].sort().slice(0, MAX_SHOW_DATES);
+}
+
 async function fetchDistrictPage(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -221,9 +235,12 @@ async function fetchDistrictPage(url) {
           };
         }
 
+        const readerText = await readerResponse.text();
+
         return {
           status: "ok",
-          readerText: await readerResponse.text(),
+          readerText,
+          dates: collectShowDates(readerText),
           source: "reader fallback",
         };
       }
@@ -235,9 +252,12 @@ async function fetchDistrictPage(url) {
       };
     }
 
+    const html = await response.text();
+
     return {
       status: "ok",
-      blocks: parseJsonLdBlocks(await response.text()),
+      blocks: parseJsonLdBlocks(html),
+      dates: collectShowDates(html),
       source: "District",
     };
   } catch (error) {
@@ -251,6 +271,46 @@ async function fetchDistrictPage(url) {
 }
 
 async function checkShowtimes(url) {
+  const first = await checkShowtimesPage(url);
+
+  if (first.status !== "ok" || first.dates.length <= 1) {
+    return first;
+  }
+
+  const baseUrl = url.split("?")[0];
+  const later = await Promise.all(
+    first.dates
+      .slice(1)
+      .map((date) => checkShowtimesPage(`${baseUrl}?fromdate=${date}`)),
+  );
+  const theatresByKey = new Map(first.theatres.map((theatre) => [theatre.key, theatre]));
+  let failedDates = 0;
+
+  for (const result of later) {
+    if (result.status !== "ok") {
+      failedDates += 1;
+      continue;
+    }
+
+    for (const theatre of result.theatres) {
+      if (!theatresByKey.has(theatre.key)) {
+        theatresByKey.set(theatre.key, theatre);
+      }
+    }
+  }
+
+  const theatres = [...theatresByKey.values()];
+
+  return {
+    status: "ok",
+    theatres,
+    reason: `${theatres.length} theatre(s) across ${first.dates.length} date(s)${
+      failedDates ? `, ${failedDates} date(s) failed` : ""
+    }; first date: ${first.reason}`,
+  };
+}
+
+async function checkShowtimesPage(url) {
   const page = await fetchDistrictPage(url);
 
   if (page.status !== "ok") {
@@ -263,6 +323,7 @@ async function checkShowtimes(url) {
     return {
       status: "ok",
       theatres,
+      dates: page.dates,
       reason: `reader fallback found ${theatres.length} theatre(s)`,
     };
   }
@@ -282,6 +343,7 @@ async function checkShowtimes(url) {
   return {
     status: "ok",
     theatres,
+    dates: page.dates,
     reason: `${screeningEventCount} screening event(s) across ${theatres.length} theatre(s)`,
   };
 }
