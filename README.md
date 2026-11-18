@@ -72,11 +72,16 @@ To let the Mac sleep again: `launchctl bootout gui/$(id -u)/com.veerabahu.ticket
 - `state.json` tracks, per movie, the set of theatres already seen open
   (`district.knownTheatres`) so each theatre only triggers one notification,
   and when each was last seen (`district.lastSeen`). A known theatre that
-  complete checks have not seen for `removeAfterMinutes` (default 5) is
-  removed and recorded in `district.removed`, so a later real opening alerts
-  and calls again. District once listed four wrong theatres for 7 minutes,
-  and also hides a real theatre for 2–3 minutes at times, which this window
-  absorbs. Partial checks (a failed date page) never remove a theatre.
+  complete checks have not seen for `removeAfterMinutes` (default 0, so the
+  next complete check) is removed and recorded in `district.removed`, so a
+  later real opening alerts and calls again. Partial checks (a failed page,
+  or the reader fallback, which may show only one language) never remove a
+  theatre.
+- Each language (Tamil, English, ...) is a separate District page set
+  (`?frmtid=<format>`, plus `&fromdate=<date>` per show date). The default
+  page shows only one language and District changes which one, so every
+  check reads every language and every date (about 12 pages for Doomsday).
+  The theatres come from the page's `__NEXT_DATA__` sessions and JSON-LD.
   It also holds a consecutive-"unknown"-checks counter that fires a one-time "this
   might be broken, go check manually" alert if District's page structure
   changes underneath the script.

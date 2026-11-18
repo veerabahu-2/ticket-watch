@@ -279,3 +279,49 @@ test("checkDistrictTheatres also finds theatres open only on later show dates", 
     ["cinema:1", "cinema:2"],
   );
 });
+
+test("checkDistrictTheatres reads every language, which District lists as separate pages", async () => {
+  const url = movieConfig().district.url;
+  const nextData = (entity, cinemaId) => ({
+    props: {
+      pageProps: {
+        data: {
+          serverState: {
+            movieContents: {
+              123: {
+                languageFormatGroups: [{ fmtGrpId: "TamilFmt" }, { fmtGrpId: "EnglishFmt" }],
+              },
+            },
+            movieSessions: {
+              [entity]: {
+                data: { sessionDates: ["2026-12-17"] },
+                arrangedSessions: [
+                  { data: { id: cinemaId, name: `Cinema ${cinemaId}` }, sessions: [{}] },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  const page = (entity, cinemaId) =>
+    `<script type="application/ld+json">${JSON.stringify({ "@type": "Movie" })}</script>` +
+    `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify(nextData(entity, cinemaId))}</script>`;
+
+  globalThis.fetch = async (requested) => {
+    const body = String(requested).includes("frmtid=englishfmt")
+      ? page("englishfmt", 2)
+      : page("tamilfmt", 1);
+    return new Response(body, { status: 200 });
+  };
+
+  const result = await checkDistrictTheatres(movieConfig());
+
+  assert.equal(result.status, "ok");
+  assert.equal(result.complete, true);
+  assert.deepEqual(
+    result.theatres.map((theatre) => theatre.key).sort(),
+    ["cinema:1", "cinema:2"],
+  );
+});

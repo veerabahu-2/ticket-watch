@@ -16,5 +16,5 @@
   ],
   "pollIntervalCron": "3/7 * * * *",
   "unknownStreakAlertThreshold": 6,
-  "removeAfterMinutes": 60
+  "removeAfterMinutes": 0
 }

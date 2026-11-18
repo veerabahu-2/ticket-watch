@@ -1,9 +1,9 @@
 import { normalizeTheatreKey } from "./sources/district.js";
 
 // A known theatre that has been missing from complete checks for this long is
-// forgotten, so a real reopening alerts again. District sometimes hides a
-// theatre for a few minutes, which must not cause a duplicate alert and call.
-export const DEFAULT_REMOVE_AFTER_MINUTES = 5;
+// forgotten, so a real reopening alerts again. 0 removes it on the next
+// complete check that does not list it.
+export const DEFAULT_REMOVE_AFTER_MINUTES = 0;
 
 function normalizeTimes(times = {}) {
   const result = {};

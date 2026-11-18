@@ -196,11 +196,80 @@ export function validateDistrictMovieConfig(movieConfig) {
 }
 
 const MAX_SHOW_DATES = 7;
+const MAX_FORMATS = 6;
+const NEXT_DATA_RE = /<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i;
+
+function parseNextData(html) {
+  const match = html.match(NEXT_DATA_RE);
+
+  if (!match) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return undefined;
+  }
+}
+
+// The page data lists the theatres of the selected language and date as
+// movieSessions.*.arrangedSessions, also when the page has no JSON-LD events.
+function collectNextDataTheatres(nextData) {
+  const theatresByKey = new Map();
+  const movieSessions = nextData?.props?.pageProps?.data?.serverState?.movieSessions || {};
+
+  for (const entity of Object.values(movieSessions)) {
+    for (const cinema of entity?.arrangedSessions || []) {
+      const id = cinema?.data?.id;
+
+      if (!id || !(cinema.sessions?.length > 0)) {
+        continue;
+      }
+
+      const key = `cinema:${id}`;
+
+      if (!theatresByKey.has(key)) {
+        theatresByKey.set(key, { key, name: cinema.data.name || key });
+      }
+    }
+  }
+
+  return [...theatresByKey.values()];
+}
+
+function collectNextDataDates(nextData) {
+  const dates = new Set();
+  const movieSessions = nextData?.props?.pageProps?.data?.serverState?.movieSessions || {};
+
+  for (const entity of Object.values(movieSessions)) {
+    for (const date of entity?.data?.sessionDates || []) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        dates.add(date);
+      }
+    }
+  }
+
+  return dates;
+}
+
+// Each language (Tamil, English, ...) is a separate format with its own
+// theatres; the default page shows only one of them, and District changes
+// which one.
+function collectFormats(text) {
+  const formats = new Set();
+
+  for (const match of text.matchAll(/"fmtGrpId":"([A-Za-z0-9]+)"|frmtid=([A-Za-z0-9]+)/g)) {
+    formats.add((match[1] || match[2]).toLowerCase());
+  }
+
+  return [...formats].sort().slice(0, MAX_FORMATS);
+}
 
 // The movie page lists only its first show date; each later date is a
 // separate ?fromdate= page, linked from the date tabs.
-function collectShowDates(text) {
-  const dates = new Set();
+function collectShowDates(text, nextData) {
+  const dates = collectNextDataDates(nextData);
 
   for (const match of text.matchAll(/fromdate=(\d{4}-\d{2}-\d{2})/g)) {
     dates.add(match[1]);
@@ -241,6 +310,7 @@ async function fetchDistrictPage(url) {
           status: "ok",
           readerText,
           dates: collectShowDates(readerText),
+          formats: collectFormats(readerText),
           source: "reader fallback",
         };
       }
@@ -253,11 +323,14 @@ async function fetchDistrictPage(url) {
     }
 
     const html = await response.text();
+    const nextData = parseNextData(html);
 
     return {
       status: "ok",
       blocks: parseJsonLdBlocks(html),
-      dates: collectShowDates(html),
+      nextDataTheatres: collectNextDataTheatres(nextData),
+      dates: collectShowDates(html, nextData),
+      formats: collectFormats(html),
       source: "District",
     };
   } catch (error) {
@@ -273,22 +346,31 @@ async function fetchDistrictPage(url) {
 async function checkShowtimes(url) {
   const first = await checkShowtimesPage(url);
 
-  if (first.status !== "ok" || first.dates.length <= 1) {
+  const formats = first.formats || [];
+
+  if (first.status !== "ok" || (formats.length === 0 && first.dates.length <= 1)) {
     return first;
   }
 
   const baseUrl = url.split("?")[0];
-  const later = await Promise.all(
-    first.dates
-      .slice(1)
-      .map((date) => checkShowtimesPage(`${baseUrl}?fromdate=${date}`)),
+  const formatFirsts = await Promise.all(
+    formats.map((format) => checkShowtimesPage(`${baseUrl}?frmtid=${format}`)),
   );
+  const laterUrls = [
+    ...first.dates.slice(1).map((date) => `${baseUrl}?fromdate=${date}`),
+    ...formats.flatMap((format, index) =>
+      (formatFirsts[index].dates || [])
+        .slice(1)
+        .map((date) => `${baseUrl}?frmtid=${format}&fromdate=${date}`),
+    ),
+  ];
+  const later = [...formatFirsts, ...(await Promise.all(laterUrls.map(checkShowtimesPage)))];
   const theatresByKey = new Map(first.theatres.map((theatre) => [theatre.key, theatre]));
-  let failedDates = 0;
+  let failedPages = 0;
 
   for (const result of later) {
     if (result.status !== "ok") {
-      failedDates += 1;
+      failedPages += 1;
       continue;
     }
 
@@ -304,10 +386,10 @@ async function checkShowtimes(url) {
   return {
     status: "ok",
     theatres,
-    complete: failedDates === 0,
-    reason: `${theatres.length} theatre(s) across ${first.dates.length} date(s)${
-      failedDates ? `, ${failedDates} date(s) failed` : ""
-    }; first date: ${first.reason}`,
+    complete: [first, ...later].every((result) => result.complete),
+    reason: `${theatres.length} theatre(s) across ${Math.max(formats.length, 1)} language(s), ${
+      later.length + 1
+    } page(s)${failedPages ? `, ${failedPages} page(s) failed` : ""}; first page: ${first.reason}`,
   };
 }
 
@@ -324,8 +406,10 @@ async function checkShowtimesPage(url) {
     return {
       status: "ok",
       theatres,
-      complete: true,
+      // The reader may show only one language, so it must not remove theatres.
+      complete: false,
       dates: page.dates,
+      formats: page.formats,
       reason: `reader fallback found ${theatres.length} theatre(s)`,
     };
   }
@@ -342,11 +426,18 @@ async function checkShowtimesPage(url) {
 
   const { screeningEventCount, theatres } = collectTheatres(blocks);
 
+  for (const theatre of page.nextDataTheatres) {
+    if (!theatres.some((known) => known.key === theatre.key)) {
+      theatres.push(theatre);
+    }
+  }
+
   return {
     status: "ok",
     theatres,
     complete: true,
     dates: page.dates,
+    formats: page.formats,
     reason: `${screeningEventCount} screening event(s) across ${theatres.length} theatre(s)`,
   };
 }
