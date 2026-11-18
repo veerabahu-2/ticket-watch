@@ -138,3 +138,29 @@ test("placeCall posts the speech and number to Bland", async () => {
     }
   }
 });
+
+test("placeCall calls every listed number in order and keeps going after a failure", async () => {
+  const saved = { key: process.env.BLAND_API_KEY, phone: process.env.BLAND_PHONE_NUMBER };
+  process.env.BLAND_API_KEY = "test-key";
+  process.env.BLAND_PHONE_NUMBER = "+910000000001, +910000000002";
+  const numbers = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    const { phone_number: phoneNumber } = JSON.parse(options.body);
+    numbers.push(phoneNumber);
+    return phoneNumber === "+910000000001"
+      ? new Response("no credits", { status: 402, statusText: "Payment Required" })
+      : new Response("{}", { status: 200 });
+  };
+
+  try {
+    await assert.rejects(placeCall({ speech: "Tickets opened" }), /failed for 1 of 2 number\(s\)/);
+    assert.deepEqual(numbers, ["+910000000001", "+910000000002"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [name, value] of [["BLAND_API_KEY", saved.key], ["BLAND_PHONE_NUMBER", saved.phone]]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});

@@ -123,34 +123,60 @@ export async function notify({ title, message, url }) {
   }
 }
 
-// Places one Bland AI phone call. Optional: skipped unless both BLAND_API_KEY
-// and BLAND_PHONE_NUMBER (E.164, e.g. +91...) are set.
+// Places Bland AI phone calls. Optional: skipped unless both BLAND_API_KEY and
+// BLAND_PHONE_NUMBER are set. BLAND_PHONE_NUMBER is one E.164 number
+// (e.g. +91...) or a comma-separated list; numbers are called in list order,
+// and a failure for one number does not stop the calls to the others.
 export async function placeCall({ speech }) {
   const apiKey = process.env.BLAND_API_KEY;
-  const phoneNumber = process.env.BLAND_PHONE_NUMBER;
+  const phoneNumbers = (process.env.BLAND_PHONE_NUMBER || "")
+    .split(",")
+    .map((phoneNumber) => phoneNumber.trim())
+    .filter(Boolean);
 
-  if (!apiKey || !phoneNumber) {
+  if (!apiKey || phoneNumbers.length === 0) {
     console.warn("Skipping phone call: BLAND_API_KEY or BLAND_PHONE_NUMBER is unset");
     return;
   }
 
-  const response = await fetch("https://api.bland.ai/v1/calls", {
-    method: "POST",
-    headers: {
-      authorization: apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      phone_number: phoneNumber,
-      first_sentence: speech,
-      task: `You are a ticket alert. Say this message, repeat it once if asked, then end the call: ${speech}`,
-      wait_for_greeting: false,
-      max_duration: 1,
-    }),
-  });
+  const failures = [];
 
-  if (!response.ok) {
-    const responseText = await response.text().catch(() => "");
-    throw new Error(`Bland returned HTTP ${response.status} ${response.statusText}: ${responseText}`);
+  for (const [index, phoneNumber] of phoneNumbers.entries()) {
+    try {
+      const response = await fetch("https://api.bland.ai/v1/calls", {
+        method: "POST",
+        headers: {
+          authorization: apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phone_number: phoneNumber,
+          first_sentence: speech,
+          task: `You are a ticket alert. Say this message, repeat it once if asked, then end the call: ${speech}`,
+          wait_for_greeting: false,
+          max_duration: 1,
+        }),
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => "");
+        failures.push(
+          new Error(
+            `number #${index + 1}: Bland returned HTTP ${response.status} ${response.statusText}: ${responseText}`,
+          ),
+        );
+      }
+    } catch (error) {
+      failures.push(
+        new Error(`number #${index + 1}: ${error?.stack || error?.message || error}`),
+      );
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `Bland call failed for ${failures.length} of ${phoneNumbers.length} number(s): ${failures.map((failure) => failure.message).join("; ")}`,
+    );
   }
 }
