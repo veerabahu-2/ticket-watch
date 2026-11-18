@@ -25,6 +25,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: Sync state
+        run: scripts/sync-state.sh
+
       - name: Poll District
         run: node src/poll.js
         env:
@@ -36,13 +39,6 @@ jobs:
 
       - name: Commit state
         run: |
-          if [ -z "$(git status --porcelain state.json)" ]; then
-            echo "state.json unchanged; skipping commit"
-            exit 0
-          fi
-
           git config user.name "ticket-watch-bot"
           git config user.email "ticket-watch-bot@users.noreply.github.com"
-          git add state.json
-          git commit -m "chore: update state [skip ci]"
-          git push
+          scripts/sync-state.sh --push "chore: update state [skip ci]"
