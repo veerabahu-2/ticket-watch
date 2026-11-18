@@ -19,6 +19,7 @@ if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
 fi
 export TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID NTFY_TOPIC
 export REQUIRE_TELEGRAM=true
+export TICKET_WATCH_RUNNER=1
 
 scripts/sync-state.sh || echo "state sync failed; polling with local state"
 

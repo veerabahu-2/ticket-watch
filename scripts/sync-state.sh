@@ -8,6 +8,12 @@ set -uo pipefail
 # Braces make bash read the whole file before running, because git reset
 # may rewrite this file while it runs.
 {
+# git reset --hard discards local work, so only run in CI or the runner clone.
+if [ -z "${CI:-}${TICKET_WATCH_RUNNER:-}" ]; then
+  echo "sync-state.sh runs only in CI or the runner clone (TICKET_WATCH_RUNNER=1)"
+  exit 1
+fi
+
 cd "$(dirname "$0")/.." || exit 1
 
 tmp="$(mktemp)"
