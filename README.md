@@ -29,7 +29,8 @@ Project folder:
   is public so Actions minutes are free.
 - Both pollers call `scripts/sync-state.sh`, which merges `state.json` with
   `origin/main` as a union of `knownTheatres` (via `scripts/merge-state.mjs`)
-  and retries the push. It runs `git reset --hard`, so it refuses to run
+  and retries the push. A theatre one poller removed stays removed unless
+  either poller saw it again after the removal. It runs `git reset --hard`, so it refuses to run
   outside CI or the runner clone.
 - Theatres are keyed as `cinema:<id>`, because District links the same cinema
   as `name-c/<id>` in JSON-LD and `name-CD<id>` on the rendered page.
@@ -70,7 +71,13 @@ To let the Mac sleep again: `launchctl bootout gui/$(id -u)/com.veerabahu.ticket
   typically open booking around the same time for a release like this.
 - `state.json` tracks, per movie, the set of theatres already seen open
   (`district.knownTheatres`) so each theatre only triggers one notification,
-  plus a consecutive-"unknown"-checks counter that fires a one-time "this
+  and when each was last seen (`district.lastSeen`). A known theatre that
+  complete checks have not seen for `removeAfterMinutes` (default 5) is
+  removed and recorded in `district.removed`, so a later real opening alerts
+  and calls again. District once listed four wrong theatres for 7 minutes,
+  and also hides a real theatre for 2–3 minutes at times, which this window
+  absorbs. Partial checks (a failed date page) never remove a theatre.
+  It also holds a consecutive-"unknown"-checks counter that fires a one-time "this
   might be broken, go check manually" alert if District's page structure
   changes underneath the script.
 - Each poll checks every movie in `config.json`'s `movies` array and sends one
@@ -116,7 +123,7 @@ URLs are rejected because they can look healthy while omitting all showtimes.
 
 `state.json` is keyed by movie `id`, each holding
 `district.knownTheatres` (theatre keys already notified), `unknownStreak`,
-and `brokenAlertSent`.
+`brokenAlertSent`, `lastSeen`, and `removed`.
 
 To track a new movie: add an entry to `config.movies` and a matching
 `"<id>": { "district": { "knownTheatres": [], "unknownStreak": 0, "brokenAlertSent": false } }`

@@ -1,9 +1,10 @@
 // Merges two state.json files: knownTheatres is a union, so a theatre that
-// either writer already notified is never notified again.
+// either writer already notified is not notified again, unless a writer
+// removed it after District stopped listing it (see src/state.js).
 // Usage: node scripts/merge-state.mjs <ours> <theirs> > merged.json
 import { readFileSync } from "node:fs";
 
-import { normalizeTheatreKey } from "../src/sources/district.js";
+import { mergeDistrictState } from "../src/state.js";
 
 const read = (p) => {
   try {
@@ -23,15 +24,7 @@ for (const [id, movie] of Object.entries(ours)) {
   merged[id] = {
     ...theirs[id],
     ...movie,
-    district: {
-      knownTheatres: [
-        ...new Set(
-          [...(b.knownTheatres || []), ...(a.knownTheatres || [])].map(normalizeTheatreKey),
-        ),
-      ],
-      unknownStreak: Math.max(a.unknownStreak || 0, b.unknownStreak || 0),
-      brokenAlertSent: Boolean(a.brokenAlertSent || b.brokenAlertSent),
-    },
+    district: mergeDistrictState(a, b),
   };
 }
 

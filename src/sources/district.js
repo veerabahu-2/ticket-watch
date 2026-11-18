@@ -304,6 +304,7 @@ async function checkShowtimes(url) {
   return {
     status: "ok",
     theatres,
+    complete: failedDates === 0,
     reason: `${theatres.length} theatre(s) across ${first.dates.length} date(s)${
       failedDates ? `, ${failedDates} date(s) failed` : ""
     }; first date: ${first.reason}`,
@@ -323,6 +324,7 @@ async function checkShowtimesPage(url) {
     return {
       status: "ok",
       theatres,
+      complete: true,
       dates: page.dates,
       reason: `reader fallback found ${theatres.length} theatre(s)`,
     };
@@ -343,6 +345,7 @@ async function checkShowtimesPage(url) {
   return {
     status: "ok",
     theatres,
+    complete: true,
     dates: page.dates,
     reason: `${screeningEventCount} screening event(s) across ${theatres.length} theatre(s)`,
   };

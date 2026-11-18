@@ -8,6 +8,7 @@ import {
   normalizeTheatreKey,
   validateDistrictMovieConfig,
 } from "./sources/district.js";
+import { DEFAULT_REMOVE_AFTER_MINUTES, recordSeenTheatres } from "./state.js";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = path.join(rootDir, "config.json");
@@ -81,9 +82,22 @@ async function handleUnknownDistrictResult(config, movieConfig, movieState, resu
   }
 }
 
-async function handleOkDistrictResult(movieConfig, movieState, result) {
+async function handleOkDistrictResult(config, movieConfig, movieState, result) {
   movieState.district.unknownStreak = 0;
   movieState.district.brokenAlertSent = false;
+
+  // Forget theatres that District stopped listing, so a later real opening
+  // alerts and calls again.
+  const removedKeys = recordSeenTheatres(
+    movieState.district,
+    result,
+    new Date(),
+    config.removeAfterMinutes ?? DEFAULT_REMOVE_AFTER_MINUTES,
+  );
+
+  if (removedKeys.length > 0) {
+    console.log(`Forgot theatre(s) no longer listed: ${removedKeys.join(", ")}`);
+  }
 
   const knownTheatres = new Set(movieState.district.knownTheatres);
   const newTheatres = result.theatres.filter((theatre) => !knownTheatres.has(theatre.key));
@@ -138,6 +152,7 @@ async function run() {
 
     if (result.status === "ok") {
       const newTheatres = await handleOkDistrictResult(
+        config,
         movieConfig,
         movieState,
         result,
