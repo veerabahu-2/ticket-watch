@@ -15,6 +15,13 @@ function errorMessage(error) {
   return error?.message || String(error);
 }
 
+// District links one cinema as both ".../name-c/1022257" (JSON-LD) and
+// ".../name-CD1022257" (rendered page), so theatres are keyed by the numeric id.
+export function normalizeTheatreKey(key) {
+  const match = String(key).match(/(?:[-/]c\/|-CD)(\d+)(?:[/?#]|$)/);
+  return match ? `cinema:${match[1]}` : key;
+}
+
 function hasType(item, type) {
   const itemType = item?.["@type"];
   return Array.isArray(itemType) ? itemType.includes(type) : itemType === type;
@@ -60,7 +67,7 @@ function collectTheatres(blocks) {
     const location = Array.isArray(block.location)
       ? block.location[0]
       : block.location;
-    const key = location?.url || location?.name;
+    const key = location?.url ? normalizeTheatreKey(location.url) : location?.name;
 
     if (!key || theatresByKey.has(key)) {
       continue;
@@ -97,13 +104,22 @@ function normalizeTitle(value) {
 function collectReaderTheatres(markdown) {
   const theatresByKey = new Map();
   const cinemaUrlRe =
-    /\[([^\]]+)\]\((https:\/\/www\.district\.in\/movies\/[^)\s]+-in-[^)\s]+-CD\d+)\)/g;
+    /\[([^\]!][^\]]*)\]\((https:\/\/www\.district\.in\/movies\/[^)\s]+-CD\d+)\)/g;
 
-  for (const match of markdown.matchAll(cinemaUrlRe)) {
-    const [, name, key] = match;
+  // Showtime theatres are list items; the page footer also links other
+  // cinemas in plain paragraphs, which must not count as open.
+  for (const line of markdown.split("\n")) {
+    if (!/^\s*[*-]\s/.test(line)) {
+      continue;
+    }
 
-    if (!theatresByKey.has(key)) {
-      theatresByKey.set(key, { key, name: name.trim() });
+    for (const match of line.matchAll(cinemaUrlRe)) {
+      const [, name, url] = match;
+      const key = normalizeTheatreKey(url);
+
+      if (!theatresByKey.has(key)) {
+        theatresByKey.set(key, { key, name: name.trim() });
+      }
     }
   }
 

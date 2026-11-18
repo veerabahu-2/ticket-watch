@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { notify } from "./notify.js";
 import {
   checkDistrictTheatres,
+  normalizeTheatreKey,
   validateDistrictMovieConfig,
 } from "./sources/district.js";
 
@@ -112,6 +113,11 @@ async function run() {
   const before = stableJson(state);
 
   assertConfigAndState(config, state);
+
+  for (const movieConfig of config.movies) {
+    const district = state[movieConfig.id].district;
+    district.knownTheatres = [...new Set(district.knownTheatres.map(normalizeTheatreKey))];
+  }
 
   for (const movieConfig of config.movies) {
     const movieState = state[movieConfig.id];

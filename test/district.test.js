@@ -5,6 +5,7 @@ import test, { afterEach } from "node:test";
 import {
   checkDistrictTheatres,
   validateDistrictMovieConfig,
+  normalizeTheatreKey,
 } from "../src/sources/district.js";
 
 const originalFetch = globalThis.fetch;
@@ -205,7 +206,11 @@ test("uses the reader fallback when District blocks the cloud request", async ()
     }
 
     return new Response(
-      "[Cinema One](https://www.district.in/movies/cinema-one-in-chennai-CD123)",
+      [
+        "*   [![Image 1: Cinema One](https://cdn.district.in/x.png)](https://www.district.in/movies/cinema-one-chennai-CD123)  [Cinema One](https://www.district.in/movies/cinema-one-chennai-CD123)  2 km away",
+        "*   [Cinema One](https://www.district.in/movies/cinema-one-in-chennai-CD123)",
+        "Find the best cinemas: [Other Cinema](https://www.district.in/movies/other-cinema-chennai-CD999)",
+      ].join("\n"),
       { status: 200 },
     );
   };
@@ -216,7 +221,7 @@ test("uses the reader fallback when District blocks the cloud request", async ()
   assert.equal(result.url, showtimesUrl);
   assert.deepEqual(result.theatres, [
     {
-      key: "https://www.district.in/movies/cinema-one-in-chennai-CD123",
+      key: "cinema:123",
       name: "Cinema One",
     },
   ]);
@@ -226,4 +231,16 @@ test("uses the reader fallback when District blocks the cloud request", async ()
     showtimesUrl,
     `${readerBase}${showtimesUrl}`,
   ]);
+});
+
+test("normalizeTheatreKey maps both District cinema URL formats to one key", () => {
+  assert.equal(
+    normalizeTheatreKey("https://www.district.in/movies/pvr-palazzo-chennai-c/1022274"),
+    "cinema:1022274",
+  );
+  assert.equal(
+    normalizeTheatreKey("https://www.district.in/movies/pvr-palazzo-chennai-CD1022274"),
+    "cinema:1022274",
+  );
+  assert.equal(normalizeTheatreKey("cinema:1022274"), "cinema:1022274");
 });
