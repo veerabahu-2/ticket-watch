@@ -34,7 +34,12 @@ Project folder:
 - Theatres are keyed as `cinema:<id>`, because District links the same cinema
   as `name-c/<id>` in JSON-LD and `name-CD<id>` on the rendered page.
 
+The launchd agent `com.veerabahu.ticket-watch.awake` runs `caffeinate -s`, so
+the Mac does not sleep while it is on power (a closed lid still sleeps unless
+an external display is connected).
+
 To stop the Mac poller: `launchctl bootout gui/$(id -u)/com.veerabahu.ticket-watch`.
+To let the Mac sleep again: `launchctl bootout gui/$(id -u)/com.veerabahu.ticket-watch.awake`.
 
 ## How it works
 
