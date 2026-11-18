@@ -1,37 +1,7 @@
 {
   "avengers-doomsday-chennai": {
     "district": {
-      "knownTheatres": [
-        "https://www.district.in/movies/pvr-palazzo-the-nexus-vijaya-mall-chennai-in-chennai-CD1022274",
-        "https://www.district.in/movies/sk-cinema-4k-3d-a-c-dolby-7-1-alandur-chennai-in-chennai-CD1037227",
-        "https://www.district.in/movies/sk-cinema-4k-3d-a-c-dolby-7-1-alandur-chennai-in-chennai-CD1053618",
-        "https://www.district.in/movies/murugan-cinemas-plf-4k-ambattur-chennai-in-chennai-CD1042465",
-        "https://www.district.in/movies/devi-cineplex-anna-salai-chennai-in-chennai-CD4184",
-        "https://www.district.in/movies/rakki-rgb-laser-4k-ambattur-in-chennai-CD1042635",
-        "https://www.district.in/movies/ega-cinemas-rgb-laser-dolby-audio-couple-sofa-kilpauk-chennai-in-chennai-CD1042615",
-        "https://www.district.in/movies/santhalinga-cinemas-multiplex-dolby-atmos-4k-laser-oragadam-in-chennai-CD1102078",
-        "https://www.district.in/movies/miraj-cinemas-sekaran-mall-perrumbakkam-in-chennai-CD1030432",
-        "https://www.district.in/movies/pvr-grand-mall-velachery-chennai-in-chennai-CD1022271",
-        "https://www.district.in/movies/pvr-perambur-spectrum-mall-perambur-chennai-in-chennai-CD1022266",
-        "https://www.district.in/movies/seven-screen-s-cinemas-kilambakkam-chennai-in-chennai-CD1102122",
-        "https://www.district.in/movies/pvr-ampa-skywalk-mall-aminjikarai-chennai-in-chennai-CD1022258",
-        "https://www.district.in/movies/pvr-grand-galada-mall-pallavaram-chennai-in-chennai-CD1022276",
-        "https://www.district.in/movies/sree-lakshmi-cinemas-a-c-2k-dolby-atmos-thiruninravur-chennai-in-chennai-CD43338",
-        "https://www.district.in/movies/moviemax-pr-mall-wall-tax-road-chennai-in-chennai-CD1102281",
-        "https://www.district.in/movies/mk-cinemas-multiplex-sriperumbudur-digital-laser-dolby-atmos-barco-projectors-in-chennai-CD1102406",
-        "https://www.district.in/movies/casino-cinemas-pure-rgb-laser-dolby-atmos-couple-seats-mount-road-chennai-in-chennai-CD1036962",
-        "https://www.district.in/movies/vettri-theatres-rgb-laser-chrompet-chennai-in-chennai-CD4891",
-        "https://www.district.in/movies/inox-national-virugambakkam-chennai-in-chennai-CD1020773",
-        "https://www.district.in/movies/inox-phoenix-market-city-formerly-jazz-cinemas-velachery-chennai-in-chennai-CD1020779",
-        "https://www.district.in/movies/pvr-sathyam-royapettah-chennai-in-chennai-CD1022244",
-        "https://www.district.in/movies/mvr-cinemas-dolby-7-1-dolby-atmos-4k-rgb-laser-guduvanchery-in-chennai-CD1101384",
-        "https://www.district.in/movies/varadaraja-cinemas-4k-rgb-laser-dolby-atmos-chennai-in-chennai-CD1037507",
-        "https://www.district.in/movies/ags-cinemas-maduravoyal-chennai-in-chennai-CD10186",
-        "https://www.district.in/movies/cinepolis-bsr-mall-omr-thoraipakkam-chennai-in-chennai-CD9505",
-        "https://www.district.in/movies/pvr-vr-mall-anna-nagar-chennai-in-chennai-CD1022304",
-        "https://www.district.in/movies/pvr-aerohub-aerohub-east-wing-chennai-in-chennai-CD1022289",
-        "https://www.district.in/movies/inox-the-marina-mall-omr-egatoor-chennai-in-chennai-CD1020778"
-      ],
+      "knownTheatres": [],
       "unknownStreak": 0,
       "brokenAlertSent": false
     }
