@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local fast-path poller, started by launchd every 2 minutes.
+# Local fast-path poller, started by launchd every 30 seconds.
 # Runs in its own clone (~/ticket-watch-runner) and shares state.json with the
 # GitHub workflow through git, so each theatre is notified only once.
 set -uo pipefail

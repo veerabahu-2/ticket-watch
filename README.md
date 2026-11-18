@@ -16,7 +16,7 @@ Project folder:
 
 ## Two pollers, one state
 
-- **Mac fast path.** `scripts/local-run.sh` runs every 2 minutes through the
+- **Mac fast path.** `scripts/local-run.sh` runs every 30 seconds through the
   launchd agent `~/Library/LaunchAgents/com.veerabahu.ticket-watch.plist`, in
   its own clone at `~/ticket-watch-runner` (outside OneDrive). It reads
   `TELEGRAM_CHAT_ID` (and optional `NTFY_TOPIC`) from
