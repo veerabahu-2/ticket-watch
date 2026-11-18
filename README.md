@@ -4,7 +4,7 @@ Watches District for ticket booking to open on a configured list of movies
 (Chennai), theatre by theatre, and pushes a phone notification via ntfy +
 Telegram naming exactly which theatre(s) just opened.
 
-Avengers Endgame: Encore (English) is currently tracked for Chennai. District
+Avengers: Doomsday is currently tracked for Chennai. District
 is checked automatically; use BookMyShow’s native **Interested** notification
 for BookMyShow availability, because it blocks cloud polling with a CAPTCHA.
 
@@ -13,6 +13,28 @@ Project folder:
 ```text
 /Users/veerabahu/Library/CloudStorage/OneDrive-TalenticaSoftware(I)Pvt.Ltd/personal_projects/ticket-watch
 ```
+
+## Two pollers, one state
+
+- **Mac fast path.** `scripts/local-run.sh` runs every 2 minutes through the
+  launchd agent `~/Library/LaunchAgents/com.veerabahu.ticket-watch.plist`, in
+  its own clone at `~/ticket-watch-runner` (outside OneDrive). It reads
+  `TELEGRAM_CHAT_ID` (and optional `NTFY_TOPIC`) from
+  `~/.config/ticket-watch/env` and the bot token from the keychain item
+  `TELEGRAM_BOT_TOKEN`. Log: `~/Library/Logs/ticket-watch.log`. It runs only
+  while the Mac is awake.
+- **GitHub backup.** cron-job.org sends a `workflow_dispatch` to `poll.yml`
+  every 3 minutes, which starts within seconds (GitHub's own `schedule` on
+  this repo ran hours apart, so it is kept only as a last fallback). The repo
+  is public so Actions minutes are free.
+- Both pollers call `scripts/sync-state.sh`, which merges `state.json` with
+  `origin/main` as a union of `knownTheatres` (via `scripts/merge-state.mjs`)
+  and retries the push. It runs `git reset --hard`, so it refuses to run
+  outside CI or the runner clone.
+- Theatres are keyed as `cinema:<id>`, because District links the same cinema
+  as `name-c/<id>` in JSON-LD and `name-CD<id>` on the rendered page.
+
+To stop the Mac poller: `launchctl bootout gui/$(id -u)/com.veerabahu.ticket-watch`.
 
 ## How it works
 
