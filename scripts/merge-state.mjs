@@ -3,6 +3,8 @@
 // Usage: node scripts/merge-state.mjs <ours> <theirs> > merged.json
 import { readFileSync } from "node:fs";
 
+import { normalizeTheatreKey } from "../src/sources/district.js";
+
 const read = (p) => {
   try {
     return JSON.parse(readFileSync(p, "utf8"));
@@ -22,7 +24,11 @@ for (const [id, movie] of Object.entries(ours)) {
     ...theirs[id],
     ...movie,
     district: {
-      knownTheatres: [...new Set([...(b.knownTheatres || []), ...(a.knownTheatres || [])])],
+      knownTheatres: [
+        ...new Set(
+          [...(b.knownTheatres || []), ...(a.knownTheatres || [])].map(normalizeTheatreKey),
+        ),
+      ],
       unknownStreak: Math.max(a.unknownStreak || 0, b.unknownStreak || 0),
       brokenAlertSent: Boolean(a.brokenAlertSent || b.brokenAlertSent),
     },
