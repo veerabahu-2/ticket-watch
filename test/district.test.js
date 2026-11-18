@@ -325,3 +325,55 @@ test("checkDistrictTheatres reads every language, which District lists as separa
     ["cinema:1", "cinema:2"],
   );
 });
+
+test("checkDistrictTheatres reports each theatre and date as a show", async () => {
+  const url = movieConfig().district.url;
+  const nextData = {
+    props: {
+      pageProps: {
+        data: {
+          serverState: {
+            movieSessions: {
+              tamilfmt: {
+                data: { sessionDates: ["2026-12-17", "2026-12-18"] },
+                arrangedSessions: [
+                  {
+                    data: { id: 2, name: "Cinema 2" },
+                    sessions: [{ showTime: "2026-12-17T00:30" }, { showTime: "2026-12-17T10:00" }],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+  const page = (startDate) =>
+    `<a href="${url}?fromdate=2026-12-18">18</a>` +
+    `<script type="application/ld+json">${JSON.stringify([
+      { "@type": "Movie", name: "Example" },
+      {
+        "@type": "ScreeningEvent",
+        startDate,
+        location: { name: "Cinema 1", url: "https://www.district.in/movies/cinema-1-chennai-c/1" },
+      },
+    ])}</script>` +
+    `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify(nextData)}</script>`;
+
+  globalThis.fetch = async (requested) =>
+    new Response(
+      String(requested).endsWith("fromdate=2026-12-18")
+        ? page("2026-12-18T09:00:00+05:30")
+        : page("2026-12-17T06:00:00+05:30"),
+      { status: 200 },
+    );
+
+  const result = await checkDistrictTheatres(movieConfig());
+
+  assert.deepEqual(
+    result.shows.map((show) => show.key).sort(),
+    ["cinema:1|2026-12-17", "cinema:1|2026-12-18", "cinema:2|2026-12-17"],
+  );
+  assert.equal(result.shows.find((show) => show.theatreKey === "cinema:2").name, "Cinema 2");
+});

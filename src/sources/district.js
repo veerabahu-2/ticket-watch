@@ -53,8 +53,29 @@ function parseJsonLdBlocks(html) {
   return blocks;
 }
 
+// A show is one theatre on one date, keyed "cinema:ID|YYYY-MM-DD", so a
+// theatre that opens a later date alerts again.
+export function showKey(theatreKey, date) {
+  return `${theatreKey}|${date}`;
+}
+
+function addShow(showsByKey, theatre, startTime) {
+  const date = String(startTime || "").slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return;
+  }
+
+  const key = showKey(theatre.key, date);
+
+  if (!showsByKey.has(key)) {
+    showsByKey.set(key, { key, theatreKey: theatre.key, name: theatre.name, date });
+  }
+}
+
 function collectTheatres(blocks) {
   const theatresByKey = new Map();
+  const showsByKey = new Map();
   let screeningEventCount = 0;
 
   for (const block of blocks) {
@@ -69,19 +90,24 @@ function collectTheatres(blocks) {
       : block.location;
     const key = location?.url ? normalizeTheatreKey(location.url) : location?.name;
 
-    if (!key || theatresByKey.has(key)) {
+    if (!key) {
       continue;
     }
 
-    theatresByKey.set(key, {
-      key,
-      name: location?.name || key,
-    });
+    if (!theatresByKey.has(key)) {
+      theatresByKey.set(key, {
+        key,
+        name: location?.name || key,
+      });
+    }
+
+    addShow(showsByKey, theatresByKey.get(key), block.startDate);
   }
 
   return {
     screeningEventCount,
     theatres: [...theatresByKey.values()],
+    shows: [...showsByKey.values()],
   };
 }
 
@@ -217,6 +243,7 @@ function parseNextData(html) {
 // movieSessions.*.arrangedSessions, also when the page has no JSON-LD events.
 function collectNextDataTheatres(nextData) {
   const theatresByKey = new Map();
+  const showsByKey = new Map();
   const movieSessions = nextData?.props?.pageProps?.data?.serverState?.movieSessions || {};
 
   for (const entity of Object.values(movieSessions)) {
@@ -232,10 +259,14 @@ function collectNextDataTheatres(nextData) {
       if (!theatresByKey.has(key)) {
         theatresByKey.set(key, { key, name: cinema.data.name || key });
       }
+
+      for (const session of cinema.sessions) {
+        addShow(showsByKey, theatresByKey.get(key), session?.showTime);
+      }
     }
   }
 
-  return [...theatresByKey.values()];
+  return { theatres: [...theatresByKey.values()], shows: [...showsByKey.values()] };
 }
 
 function collectNextDataDates(nextData) {
@@ -328,7 +359,7 @@ async function fetchDistrictPage(url) {
     return {
       status: "ok",
       blocks: parseJsonLdBlocks(html),
-      nextDataTheatres: collectNextDataTheatres(nextData),
+      nextData: collectNextDataTheatres(nextData),
       dates: collectShowDates(html, nextData),
       formats: collectFormats(html),
       source: "District",
@@ -366,6 +397,7 @@ async function checkShowtimes(url) {
   ];
   const later = [...formatFirsts, ...(await Promise.all(laterUrls.map(checkShowtimesPage)))];
   const theatresByKey = new Map(first.theatres.map((theatre) => [theatre.key, theatre]));
+  const showsByKey = new Map(first.shows.map((show) => [show.key, show]));
   let failedPages = 0;
 
   for (const result of later) {
@@ -379,6 +411,12 @@ async function checkShowtimes(url) {
         theatresByKey.set(theatre.key, theatre);
       }
     }
+
+    for (const show of result.shows) {
+      if (!showsByKey.has(show.key)) {
+        showsByKey.set(show.key, show);
+      }
+    }
   }
 
   const theatres = [...theatresByKey.values()];
@@ -386,6 +424,7 @@ async function checkShowtimes(url) {
   return {
     status: "ok",
     theatres,
+    shows: [...showsByKey.values()],
     complete: [first, ...later].every((result) => result.complete),
     reason: `${theatres.length} theatre(s) across ${Math.max(formats.length, 1)} language(s), ${
       later.length + 1
@@ -397,7 +436,7 @@ async function checkShowtimesPage(url) {
   const page = await fetchDistrictPage(url);
 
   if (page.status !== "ok") {
-    return { ...page, theatres: [] };
+    return { ...page, theatres: [], shows: [] };
   }
 
   if (page.readerText) {
@@ -406,6 +445,8 @@ async function checkShowtimesPage(url) {
     return {
       status: "ok",
       theatres,
+      // The reader text has no show dates.
+      shows: [],
       // The reader may show only one language, so it must not remove theatres.
       complete: false,
       dates: page.dates,
@@ -424,17 +465,24 @@ async function checkShowtimesPage(url) {
     };
   }
 
-  const { screeningEventCount, theatres } = collectTheatres(blocks);
+  const { screeningEventCount, theatres, shows } = collectTheatres(blocks);
 
-  for (const theatre of page.nextDataTheatres) {
+  for (const theatre of page.nextData.theatres) {
     if (!theatres.some((known) => known.key === theatre.key)) {
       theatres.push(theatre);
+    }
+  }
+
+  for (const show of page.nextData.shows) {
+    if (!shows.some((known) => known.key === show.key)) {
+      shows.push(show);
     }
   }
 
   return {
     status: "ok",
     theatres,
+    shows,
     complete: true,
     dates: page.dates,
     formats: page.formats,

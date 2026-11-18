@@ -22,9 +22,28 @@ function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function buildNewTheatreMessage(movieConfig, theatre, districtUrl) {
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatDate(date) {
+  const [, month, day] = date.split("-").map(Number);
+  return `${day} ${MONTHS[month - 1]}`;
+}
+
+function formatDates(dates) {
+  return [...dates].sort().map(formatDate).join(", ");
+}
+
+function buildAlertTitle(movieConfig, alert) {
+  const dates = alert.dates.length > 0 ? ` (${formatDates(alert.dates)})` : "";
+
+  return alert.isNewTheatre
+    ? `${movieConfig.title} tickets just opened at ${alert.name}${dates}!`
+    : `${movieConfig.title}: new date${alert.dates.length > 1 ? "s" : ""} at ${alert.name}${dates}!`;
+}
+
+function buildNewTheatreMessage(movieConfig, alert, districtUrl) {
   return [
-    `${movieConfig.title} tickets just opened at ${theatre.name}.`,
+    `${buildAlertTitle(movieConfig, alert)}`,
     "",
     `District: ${districtUrl}`,
     `BookMyShow: ${movieConfig.bookmyshow.url}`,
@@ -101,36 +120,98 @@ async function handleOkDistrictResult(config, movieConfig, movieState, result) {
 
   const knownTheatres = new Set(movieState.district.knownTheatres);
   const newTheatres = result.theatres.filter((theatre) => !knownTheatres.has(theatre.key));
+  const newShows = handleDistrictShows(config, movieState, result);
 
-  if (newTheatres.length === 0) {
-    return newTheatres;
-  }
+  // One alert per theatre: a new theatre, or new dates at a known theatre.
+  const alerts = new Map();
 
   for (const theatre of newTheatres) {
-    await notify({
-      title: `${movieConfig.title} tickets just opened at ${theatre.name}!`,
-      message: buildNewTheatreMessage(movieConfig, theatre, result.url),
-      url: result.url,
-    });
+    alerts.set(theatre.key, { name: theatre.name, isNewTheatre: true, dates: [] });
+  }
+
+  for (const show of newShows) {
+    if (!alerts.has(show.theatreKey)) {
+      alerts.set(show.theatreKey, { name: show.name, isNewTheatre: false, dates: [] });
+    }
+
+    alerts.get(show.theatreKey).dates.push(show.date);
   }
 
   movieState.district.knownTheatres.push(
     ...newTheatres.map((theatre) => theatre.key),
   );
 
+  if (alerts.size === 0) {
+    return { newTheatres, newShows };
+  }
+
+  for (const alert of alerts.values()) {
+    await notify({
+      title: buildAlertTitle(movieConfig, alert),
+      message: buildNewTheatreMessage(movieConfig, alert, result.url),
+      url: result.url,
+    });
+  }
+
   // The call is best effort: a failed call must not block saving state, or
   // the next poll would resend every text alert.
   try {
+    const parts = [...alerts.values()].map((alert) =>
+      alert.dates.length > 0 ? `${alert.name} for ${formatDates(alert.dates)}` : alert.name,
+    );
+
     await placeCall({
-      speech: `${movieConfig.title} tickets just opened at ${newTheatres
-        .map((theatre) => theatre.name)
-        .join(", ")}. Book now on District.`,
+      speech: `${movieConfig.title} tickets just opened at ${parts.join("; ")}. Book now on District.`,
     });
   } catch (error) {
     console.error(`Phone call failed: ${error?.stack || error?.message || error}`);
   }
 
-  return newTheatres;
+  return { newTheatres, newShows };
+}
+
+// Tracks each theatre and date as a show, so a theatre that opens a later
+// date alerts again. Returns the new shows.
+function handleDistrictShows(config, movieState, result) {
+  const shows = result.shows || [];
+  const showResult = {
+    theatres: shows,
+    // A theatre without any dated show means the dates were not readable,
+    // so missing shows must not count as removed.
+    complete:
+      result.complete &&
+      result.theatres.every((theatre) => shows.some((show) => show.theatreKey === theatre.key)),
+  };
+
+  // The first run with show tracking learns the open dates without alerts,
+  // because those theatres were already alerted.
+  if (!movieState.districtShows) {
+    movieState.districtShows = {
+      knownTheatres: shows.map((show) => show.key),
+      unknownStreak: 0,
+      brokenAlertSent: false,
+    };
+    recordSeenTheatres(movieState.districtShows, showResult, new Date(), 0);
+    console.log(`Learned ${shows.length} open show date(s) without alerts`);
+    return [];
+  }
+
+  const removedKeys = recordSeenTheatres(
+    movieState.districtShows,
+    showResult,
+    new Date(),
+    config.removeAfterMinutes ?? DEFAULT_REMOVE_AFTER_MINUTES,
+  );
+
+  if (removedKeys.length > 0) {
+    console.log(`Forgot show date(s) no longer listed: ${removedKeys.join(", ")}`);
+  }
+
+  const known = new Set(movieState.districtShows.knownTheatres);
+  const newShows = shows.filter((show) => !known.has(show.key));
+  movieState.districtShows.knownTheatres.push(...newShows.map((show) => show.key));
+
+  return newShows;
 }
 
 async function run() {
@@ -149,21 +230,23 @@ async function run() {
     const movieState = state[movieConfig.id];
     const result = await checkDistrictTheatres(movieConfig);
     let newTheatreCount = 0;
+    let newShowCount = 0;
 
     if (result.status === "ok") {
-      const newTheatres = await handleOkDistrictResult(
+      const { newTheatres, newShows } = await handleOkDistrictResult(
         config,
         movieConfig,
         movieState,
         result,
       );
       newTheatreCount = newTheatres.length;
+      newShowCount = newShows.length;
     } else {
       await handleUnknownDistrictResult(config, movieConfig, movieState, result);
     }
 
     console.log(
-      `[${new Date().toISOString()}] ${movieConfig.id} district=${result.status} newTheatres=${newTheatreCount} knownTheatres=${movieState.district.knownTheatres.length} reason=${result.reason}`,
+      `[${new Date().toISOString()}] ${movieConfig.id} district=${result.status} newTheatres=${newTheatreCount} newShows=${newShowCount} knownTheatres=${movieState.district.knownTheatres.length} knownShows=${movieState.districtShows?.knownTheatres.length ?? 0} reason=${result.reason}`,
     );
   }
 

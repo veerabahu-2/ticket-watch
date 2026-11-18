@@ -97,3 +97,32 @@ test("merge accepts state written before lastSeen and removed existed", () => {
     removed: {},
   });
 });
+
+test("merge-state keeps districtShows absent until a poller seeds it", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const path = await import("node:path");
+  const dir = mkdtempSync(path.join(tmpdir(), "merge-state-"));
+  const write = (name, value) => {
+    const file = path.join(dir, name);
+    writeFileSync(file, JSON.stringify(value));
+    return file;
+  };
+  const merge = (ours, theirs) =>
+    JSON.parse(
+      execFileSync("node", [
+        "scripts/merge-state.mjs",
+        write("ours.json", ours),
+        write("theirs.json", theirs),
+      ]),
+    );
+  const plain = { m: { district: district(["cinema:1"]) } };
+  const seeded = {
+    m: { district: district(["cinema:1"]), districtShows: district(["cinema:1|2026-12-17"]) },
+  };
+
+  assert.equal(merge(plain, plain).m.districtShows, undefined);
+  assert.deepEqual(merge(plain, seeded).m.districtShows.knownTheatres, ["cinema:1|2026-12-17"]);
+  assert.deepEqual(merge(seeded, plain).m.districtShows.knownTheatres, ["cinema:1|2026-12-17"]);
+});

@@ -1,4 +1,4 @@
-// Merges two state.json files: knownTheatres is a union, so a theatre that
+// Merges two state.json files: knownTheatres (and districtShows) is a union, so a theatre that
 // either writer already notified is not notified again, unless a writer
 // removed it after District stopped listing it (see src/state.js).
 // Usage: node scripts/merge-state.mjs <ours> <theirs> > merged.json
@@ -26,6 +26,15 @@ for (const [id, movie] of Object.entries(ours)) {
     ...movie,
     district: mergeDistrictState(a, b),
   };
+
+  // districtShows uses the same rules, with one "theatre|date" key per show.
+  // It stays absent until a poller seeds it, so the seed run sends no alerts.
+  if (movie.districtShows || theirs[id]?.districtShows) {
+    merged[id].districtShows = mergeDistrictState(
+      movie.districtShows || {},
+      theirs[id]?.districtShows || {},
+    );
+  }
 }
 
 process.stdout.write(`${JSON.stringify(merged, null, 2)}\n`);
