@@ -17,8 +17,8 @@
         "cinema:1037033",
         "cinema:5059"
       ],
-      "unknownStreak": 5,
-      "brokenAlertSent": false,
+      "unknownStreak": 6,
+      "brokenAlertSent": true,
       "lastSeen": {
         "cinema:1022289": "2026-11-22T08:39:29.704Z",
         "cinema:1022257": "2026-11-22T08:39:29.704Z",
