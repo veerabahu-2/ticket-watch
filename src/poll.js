@@ -123,15 +123,33 @@ async function handleOkDistrictResult(config, movieConfig, movieState, result) {
   const newShows = handleDistrictShows(config, movieState, result);
 
   // One alert per theatre: a new theatre, or new dates at a known theatre.
+  // With alertDates set, only new shows on those dates alert (text and call);
+  // other new theatres and dates are still learned, so they stay silent.
+  const alertDates = movieConfig.alertDates?.length ? new Set(movieConfig.alertDates) : null;
+  const newTheatreKeys = new Set(newTheatres.map((theatre) => theatre.key));
   const alerts = new Map();
 
   for (const theatre of newTheatres) {
-    alerts.set(theatre.key, { name: theatre.name, isNewTheatre: true, dates: [] });
+    // A new theatre without readable dates still alerts, so a fallback read
+    // cannot hide an opening.
+    const hasShows = (result.shows || []).some((show) => show.theatreKey === theatre.key);
+
+    if (!alertDates || !hasShows) {
+      alerts.set(theatre.key, { name: theatre.name, isNewTheatre: true, dates: [] });
+    }
   }
 
   for (const show of newShows) {
+    if (alertDates && !alertDates.has(show.date)) {
+      continue;
+    }
+
     if (!alerts.has(show.theatreKey)) {
-      alerts.set(show.theatreKey, { name: show.name, isNewTheatre: false, dates: [] });
+      alerts.set(show.theatreKey, {
+        name: show.name,
+        isNewTheatre: newTheatreKeys.has(show.theatreKey),
+        dates: [],
+      });
     }
 
     alerts.get(show.theatreKey).dates.push(show.date);

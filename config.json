@@ -4,6 +4,7 @@
       "id": "avengers-doomsday-chennai",
       "title": "Avengers: Doomsday",
       "city": "Chennai",
+      "alertDates": ["2026-12-17"],
       "district": {
         "url": "https://www.district.in/movies/avengers-doomsday-movie-tickets-in-chennai-MV176735",
         "contentId": "176735"
